@@ -12,7 +12,9 @@ from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 import re
+import json
 from src.libs.resume_and_cover_builder import ResumeFacade, ResumeGenerator, StyleManager
+from src.inbox.service import InboxScanService
 from src.resume_schemas.job_application_profile import JobApplicationProfile
 from src.resume_schemas.resume import Resume
 from src.logging import logger
@@ -167,18 +169,48 @@ class ConfigValidator:
 
     @staticmethod
     def validate_secrets(secrets_yaml_path: Path) -> str:
-        """Validate the secrets YAML file and retrieve the LLM API key."""
+        """Validate the secrets YAML file and retrieve the LLM API key.
+
+        Supports a generic 'llm_api_key' or model-specific keys:
+          - 'gemini_api_key'   for Google Gemini models
+          - 'openai_api_key'   for OpenAI models
+          - 'claude_api_key'   for Anthropic Claude models
+          - 'huggingface_api_key' for HuggingFace models
+          - 'perplexity_api_key'  for Perplexity models
+        Falls back to 'llm_api_key' if no model-specific key is found.
+        """
+        import config as cfg
+
         secrets = ConfigValidator.load_yaml(secrets_yaml_path)
-        mandatory_secrets = ["llm_api_key"]
 
-        for secret in mandatory_secrets:
-            if secret not in secrets:
-                raise ConfigError(f"Missing secret '{secret}' in {secrets_yaml_path}")
+        # Model-type to key name mapping
+        model_key_map = {
+            "gemini": "gemini_api_key",
+            "openai": "openai_api_key",
+            "claude": "claude_api_key",
+            "huggingface": "huggingface_api_key",
+            "perplexity": "perplexity_api_key",
+        }
 
-            if not secrets[secret]:
-                raise ConfigError(f"Secret '{secret}' cannot be empty in {secrets_yaml_path}")
+        model_type = getattr(cfg, "LLM_MODEL_TYPE", "openai")
+        specific_key = model_key_map.get(model_type)
 
-        return secrets["llm_api_key"]
+        # Try model-specific key first, then fall back to generic llm_api_key
+        if specific_key and specific_key in secrets and secrets[specific_key]:
+            return secrets[specific_key]
+
+        if "llm_api_key" in secrets and secrets["llm_api_key"]:
+            return secrets["llm_api_key"]
+
+        # Ollama doesn't need an API key
+        if model_type == "ollama":
+            return ""
+
+        key_name = specific_key or "llm_api_key"
+        raise ConfigError(
+            f"Missing or empty API key for model type '{model_type}'. "
+            f"Add '{key_name}' or 'llm_api_key' to {secrets_yaml_path}"
+        )
 
 
 class FileManager:
@@ -467,8 +499,56 @@ def create_resume_pdf(parameters: dict, llm_api_key: str):
         logger.exception(f"An error occurred while creating the CV: {e}")
         raise
 
+
+def scan_email_inbox(parameters: dict):
+    """
+    Scan inbox for job-related messages and classify them into rejection,
+    recruiter outreach, interview, and other categories.
+    """
+    try:
+        questions = [
+            inquirer.Text(
+                "lookback_hours",
+                message="How many hours back should JobHawk scan your inbox?",
+                default="168",
+            )
+        ]
+        answer = inquirer.prompt(questions) or {}
+        lookback_raw = answer.get("lookback_hours", "168")
+
+        try:
+            lookback_hours = int(lookback_raw)
+            if lookback_hours <= 0:
+                raise ValueError
+        except ValueError:
+            raise ConfigError("lookback_hours must be a positive integer")
+
+        secrets_file = parameters.get("secretsFile")
+        if not secrets_file:
+            raise ConfigError("Missing secrets file path in runtime parameters")
+
+        secrets = ConfigValidator.load_yaml(secrets_file)
+        scanner = InboxScanService(output_directory=Path(parameters["outputFileDirectory"]))
+        summary = scanner.run_scan(secrets=secrets, lookback_hours=lookback_hours)
+
+        summary_text = {
+            "source_email": summary.source_email,
+            "lookback_hours": summary.lookback_hours,
+            "total_messages": summary.total_messages,
+            "interview_messages": summary.interview_messages,
+            "recruiter_messages": summary.recruiter_messages,
+            "rejection_messages": summary.rejection_messages,
+            "other_messages": summary.other_messages,
+            "latest_report": str(Path(parameters["outputFileDirectory"]) / "email_scan_report_latest.json"),
+        }
+        print(json.dumps(summary_text, indent=2))
+        logger.info("Inbox scan completed successfully.")
+    except Exception as e:
+        logger.exception(f"Inbox scan failed: {e}")
+        raise
+
         
-def handle_inquiries(selected_actions: List[str], parameters: dict, llm_api_key: str):
+def handle_inquiries(selected_actions: List[str], parameters: dict, llm_api_key: Optional[str] = None):
     """
     Decide which function to call based on the selected user actions.
 
@@ -477,18 +557,32 @@ def handle_inquiries(selected_actions: List[str], parameters: dict, llm_api_key:
     :param llm_api_key: API key for the language model.
     """
     try:
+        def require_llm_key() -> str:
+            nonlocal llm_api_key
+            if llm_api_key:
+                return llm_api_key
+            secrets_file = parameters.get("secretsFile")
+            if not secrets_file:
+                raise ConfigError("Secrets file path missing. Cannot load LLM API key.")
+            llm_api_key = ConfigValidator.validate_secrets(secrets_file)
+            return llm_api_key
+
         if selected_actions:
             if "Generate Resume" == selected_actions:
                 logger.info("Crafting a standout professional resume...")
-                create_resume_pdf(parameters, llm_api_key)
+                create_resume_pdf(parameters, require_llm_key())
                 
             if "Generate Resume Tailored for Job Description" == selected_actions:
                 logger.info("Customizing your resume to enhance your job application...")
-                create_resume_pdf_job_tailored(parameters, llm_api_key)
+                create_resume_pdf_job_tailored(parameters, require_llm_key())
                 
             if "Generate Tailored Cover Letter for Job Description" == selected_actions:
                 logger.info("Designing a personalized cover letter to enhance your job application...")
-                create_cover_letter(parameters, llm_api_key)
+                create_cover_letter(parameters, require_llm_key())
+
+            if "Scan Inbox for Rejections/Recruiters/Interviews" == selected_actions:
+                logger.info("Scanning inbox and classifying job-related emails...")
+                scan_email_inbox(parameters)
 
         else:
             logger.warning("No actions selected. Nothing to execute.")
@@ -511,6 +605,7 @@ def prompt_user_action() -> str:
                     "Generate Resume",
                     "Generate Resume Tailored for Job Description",
                     "Generate Tailored Cover Letter for Job Description",
+                    "Scan Inbox for Rejections/Recruiters/Interviews",
                 ],
             ),
         ]
@@ -533,17 +628,16 @@ def main():
 
         # Validate configuration and secrets
         config = ConfigValidator.validate_config(config_file)
-        llm_api_key = ConfigValidator.validate_secrets(secrets_file)
-
         # Prepare parameters
         config["uploads"] = FileManager.get_uploads(plain_text_resume_file)
         config["outputFileDirectory"] = output_folder
+        config["secretsFile"] = secrets_file
 
         # Interactive prompt for user to select actions
         selected_actions = prompt_user_action()
 
         # Handle selected actions and execute them
-        handle_inquiries(selected_actions, config, llm_api_key)
+        handle_inquiries(selected_actions, config)
 
     except ConfigError as ce:
         logger.error(f"Configuration error: {ce}")

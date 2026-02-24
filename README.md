@@ -24,3 +24,50 @@ AIHawk has been featured by major media outlets for revolutionizing how job seek
 [**Vanity Fair**](https://www.vanityfair.it/article/intelligenza-artificiale-candidature-di-lavoro)
 [**404 Media**](https://www.404media.co/i-applied-to-2-843-roles-the-rise-of-ai-powered-job-application-bots/)
 
+
+---
+
+## Terminal inbox scanning (v0.2.0)
+
+JobHawk can now scan your inbox and classify job-response emails into:
+
+- `interview`
+- `recruiter`
+- `rejection`
+- `other`
+
+### Setup
+
+Add these fields to `data_folder/secrets.yaml`:
+
+```yaml
+inbox_email: 'YOUR_EMAIL@example.com'
+inbox_provider: 'gmail'  # gmail | outlook | yahoo | imap
+inbox_app_password: 'YOUR_APP_PASSWORD_HERE'
+# Optional for custom IMAP provider:
+# imap_host: 'imap.yourmailhost.com'
+# imap_port: 993
+```
+
+### Run
+
+```bash
+python main.py
+```
+
+Choose:
+
+`Scan Inbox for Rejections/Recruiters/Interviews`
+
+### Output
+
+Reports are generated in `data_folder/output/`:
+
+- `email_scan_report_latest.json`
+- `email_scan_report_YYYYMMDD_HHMMSS.json`
+
+### Notes
+
+- Use an app-specific password (recommended), not your normal mailbox password.
+- Inbox scanning does not require an LLM API key.
+
