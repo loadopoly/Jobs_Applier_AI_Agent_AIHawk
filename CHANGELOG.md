@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.1] - 2026-02-24
+
+### Added
+- New terminal action: `Summarize Job Application Results`
+- New application results service in `src/application_stats.py` that reports:
+  - total jobs
+  - successes
+  - failures
+  - unknown statuses
+- New tests in `tests/test_application_stats.py`
+
+### Changed
+- README updated with usage instructions for application summary command.
+
 ## [0.2.0] - 2026-02-24
 
 ### Added

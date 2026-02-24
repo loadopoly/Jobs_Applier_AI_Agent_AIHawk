@@ -71,3 +71,28 @@ Reports are generated in `data_folder/output/`:
 - Use an app-specific password (recommended), not your normal mailbox password.
 - Inbox scanning does not require an LLM API key.
 
+---
+
+## Terminal application result summary (v0.2.1)
+
+JobHawk can summarize how many jobs were applied to and classify outcomes.
+
+### Run
+
+```bash
+python main.py
+```
+
+Choose:
+
+`Summarize Job Application Results`
+
+### Output fields
+
+- `total_jobs`: total saved application folders in `job_applications/`
+- `successes`: status matched as applied/submitted/success/interview/offer
+- `failures`: status matched as failed/error/rejected/declined/cancelled
+- `unknown`: status missing or not recognized
+
+This command reads `job_applications/*/job_application.json` and prints a JSON summary to terminal.
+
