@@ -15,6 +15,7 @@ import re
 import json
 from src.libs.resume_and_cover_builder import ResumeFacade, ResumeGenerator, StyleManager
 from src.inbox.service import InboxScanService
+from src.application_stats import ApplicationStatsService
 from src.resume_schemas.job_application_profile import JobApplicationProfile
 from src.resume_schemas.resume import Resume
 from src.logging import logger
@@ -547,6 +548,23 @@ def scan_email_inbox(parameters: dict):
         logger.exception(f"Inbox scan failed: {e}")
         raise
 
+
+def summarize_application_results(parameters: dict):
+    """Summarize applied jobs and classify outcomes into success/failure buckets."""
+    try:
+        applications_dir = Path("job_applications")
+        stats = ApplicationStatsService(applications_dir=applications_dir).summarize()
+
+        summary_text = {
+            "applications_directory": str(applications_dir.resolve()),
+            **stats.as_dict(),
+        }
+        print(json.dumps(summary_text, indent=2))
+        logger.info("Application summary generated successfully.")
+    except Exception as e:
+        logger.exception(f"Failed to summarize application results: {e}")
+        raise
+
         
 def handle_inquiries(selected_actions: List[str], parameters: dict, llm_api_key: Optional[str] = None):
     """
@@ -584,6 +602,10 @@ def handle_inquiries(selected_actions: List[str], parameters: dict, llm_api_key:
                 logger.info("Scanning inbox and classifying job-related emails...")
                 scan_email_inbox(parameters)
 
+            if "Summarize Job Application Results" == selected_actions:
+                logger.info("Summarizing job applications with successes and failures...")
+                summarize_application_results(parameters)
+
         else:
             logger.warning("No actions selected. Nothing to execute.")
     except Exception as e:
@@ -606,6 +628,7 @@ def prompt_user_action() -> str:
                     "Generate Resume Tailored for Job Description",
                     "Generate Tailored Cover Letter for Job Description",
                     "Scan Inbox for Rejections/Recruiters/Interviews",
+                    "Summarize Job Application Results",
                 ],
             ),
         ]

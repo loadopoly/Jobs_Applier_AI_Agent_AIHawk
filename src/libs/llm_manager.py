@@ -132,7 +132,6 @@ class PerplexityModel(AIModel):
         response = self.model.invoke(prompt)
         return response
 
-# gemini doesn't seem to work because API doesn't rstitute answers for questions that involve answers that are too short
 class GeminiModel(AIModel):
     def __init__(self, api_key: str, llm_model: str):
         from langchain_google_genai import (
@@ -144,6 +143,8 @@ class GeminiModel(AIModel):
         self.model = ChatGoogleGenerativeAI(
             model=llm_model,
             google_api_key=api_key,
+            temperature=0.4,
+            convert_system_message_to_human=True,
             safety_settings={
                 HarmCategory.HARM_CATEGORY_UNSPECIFIED: HarmBlockThreshold.BLOCK_NONE,
                 HarmCategory.HARM_CATEGORY_DEROGATORY: HarmBlockThreshold.BLOCK_NONE,
@@ -160,6 +161,7 @@ class GeminiModel(AIModel):
         )
 
     def invoke(self, prompt: str) -> BaseMessage:
+        logger.debug("Invoking Gemini API")
         response = self.model.invoke(prompt)
         return response
 

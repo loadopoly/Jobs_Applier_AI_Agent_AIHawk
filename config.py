@@ -1,6 +1,6 @@
 # In this file, you can set the configurations of the app.
 
-from src.utils.constants import DEBUG, ERROR, LLM_MODEL, OPENAI
+from src.utils.constants import DEBUG, ERROR
 
 #config related to logging must have prefix LOG_
 LOG_LEVEL = 'ERROR'
@@ -16,7 +16,9 @@ JOB_SUITABILITY_SCORE = 7
 JOB_MAX_APPLICATIONS = 5
 JOB_MIN_APPLICATIONS = 1
 
-LLM_MODEL_TYPE = 'openai'
-LLM_MODEL = 'gpt-4o-mini'
+# Selectable LLM provider: 'gemini' | 'openai' | 'claude' | 'ollama' | 'huggingface' | 'perplexity'
+LLM_MODEL_TYPE = 'gemini'
+# Gemini 2.5 Flash is the baseline model; change to any model supported by the chosen provider
+LLM_MODEL = 'gemini-2.5-flash'
 # Only required for OLLAMA models
 LLM_API_URL = ''

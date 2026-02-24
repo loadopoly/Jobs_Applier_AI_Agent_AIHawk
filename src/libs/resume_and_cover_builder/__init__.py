@@ -1,4 +1,4 @@
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 
 # Import all the necessary classes and functions, called when the package is imported
 from .resume_generator import ResumeGenerator
