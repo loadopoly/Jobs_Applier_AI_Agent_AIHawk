@@ -46,3 +46,7 @@ title_blacklist:
 location_blacklist:
   - Brazil
 
+# Optional inbox scan settings for JobHawk terminal action
+inbox_scan_enabled: true
+inbox_scan_lookback_hours: 168
+
