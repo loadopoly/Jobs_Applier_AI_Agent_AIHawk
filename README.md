@@ -134,73 +134,51 @@ This keeps auto-apply focused on higher-probability roles for Supply Chain Manag
 
 ---
 
-## Multi-format resumes, tailored apply, email inbox & pipeline tracker (v0.6.0)
+## Multi-format resumes, background batching, live logs & auto-pipeline (v0.7.0)
+
+### Real-time Batch Tracking
+
+You no longer have to wait for a batch to finish to see results. The **Start Batch** process now runs in the background:
+- **Live Logs**: Watch the bot's activity (searching, scoring, applying) in real-time in the Output panel.
+- **Auto-Scrolling**: The log view stays synced with the newest activity.
+- **Background Execution**: You can browse the Pipeline Tracker or scan your inbox while a batch is still running.
+
+### Auto-Pipeline Management
+
+Email scanning is now integrated with your **Pipeline Tracker**:
+- When you run **🔍 Scan Inbox**, the system matches recruiter emails to your pending job applications.
+- **Auto-Confirm**: If an interview or "next step" is detected, the job status moves to `confirmed` automatically.
+- **Auto-Discard**: If a rejection is detected, the temporary resume is marked as `discarded`.
+- The dashboard notifies you how many job statuses were automatically updated after each scan.
 
 ### Resume upload — any format
 
-The web dashboard now accepts resumes in any common format:
+The web dashboard accepts resumes in any common format:
 
-- **PDF** — text extracted via `pdfminer.six`
-- **DOCX / DOC** — extracted via `python-docx`
-- **RTF** — extracted via `striprtf`
-- **TXT** — plain read with encoding detection
-- **YAML / YML** — used directly (existing schema)
+- **PDF, DOCX, DOC, RTF, TXT, YAML**
 
-All formats are normalised to internal YAML on save. The bot reads positions and skills from the uploaded resume automatically — no hardcoded role lists.
+All formats are normalised to internal YAML on save. The bot reads positions and skills from the uploaded resume automatically.
 
 ### Tailored resume per job
 
 For every job that clears the ATS threshold the system generates a **job-specific resume variant**:
 
 1. The LLM rewrites bullet points to naturally incorporate missing keywords.
-2. A `resume_tailored.pdf` is produced via `reportlab` (formatted, print-ready).
-3. An `interview_highlights.txt` is created with 5-8 role-specific talking points.
-4. All files live in `temp_resumes/<job_id>/`.
-
-**Lifecycle:**
-
-| Event | Action |
-|---|---|
-| Job batch applied | `pending` — temp resume created |
-| Rejection email detected | `discarded` — PDF deleted, YAML kept |
-| Pipeline confirmed (email or user click) | `confirmed` — PDF + highlights unlocked for download |
-
-### Pipeline Tracker (dashboard)
-
-The **Pipeline Tracker** table in the dashboard shows every job a tailored resume was generated for:
-
-- **Confirm** — pipeline progressing; unlocks PDF + highlights download
-- **Reject** — rejection; discards temp PDF
-- **⬇ Resume PDF** — download the tailored PDF (confirmed only)
-- **📝 Highlights** — download interview prep notes
+2. A `resume_tailored.pdf` is produced via `reportlab`.
+3. An `interview_highlights.txt` is created with role-specific talking points.
 
 ### Email inbox monitoring
 
-Connect your IMAP email box to auto-classify incoming messages:
+Connect your IMAP email box to auto-classify incoming messages. Use [App Passwords](https://myaccount.google.com/apppasswords) for Gmail.
 
-1. Go to **Email Inbox Setup** in the dashboard.
-2. Enter your IMAP host, port, and app password.
-3. Click **Save & Test Connection**.
-4. Use **Scan Inbox** to classify the last N hours of messages as:
-   - `rejection` — recruiter passed
-   - `pipeline` — next steps / interview / offer
-   - `unknown` — unclassified
-
-> **Gmail tip:** Use [App Passwords](https://myaccount.google.com/apppasswords) — not your main login.
-
-### New API endpoints (v0.6.0)
+### New API endpoints (v0.7.0)
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/resume` | Resume summary (name, positions, skills) |
-| `POST` | `/api/upload-resume` | Upload resume (any format) |
+| `GET` | `/api/batch-status` | Get live activity logs and running state |
 | `GET` | `/api/tailored-resumes` | List all tailored resumes |
 | `GET` | `/api/tailored-resumes/{job_id}/pdf` | Download tailored PDF (confirmed only) |
-| `GET` | `/api/tailored-resumes/{job_id}/highlights` | Download interview highlights |
-| `POST` | `/api/pipeline/{job_id}/confirm` | Confirm pipeline → unlock delivery |
-| `POST` | `/api/pipeline/{job_id}/reject` | Mark as rejected → discard PDF |
+| `POST` | `/api/email/scan?hours=N` | Scan inbox & **auto-update pipeline stats** |
 | `GET` | `/api/email/config` | Check email config status |
-| `POST` | `/api/email/config` | Save &amp; test IMAP credentials |
-| `GET` | `/api/email/scan?hours=N` | Scan inbox, classify messages |
 
 

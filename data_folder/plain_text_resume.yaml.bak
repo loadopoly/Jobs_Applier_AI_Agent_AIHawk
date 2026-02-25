@@ -1,117 +1,110 @@
 _converted: true
-_source_format: txt
-raw_text: 'Liam Murphy
-
-  Galway, Ireland
-
-  Email: liam.murphy@gmail.com | AIHawk: liam-murphy
-
-  GitHub: liam-murphy | Phone: +353 871234567
-
-
-  Education
-
-  Bachelor''s Degree in Computer Science
-
-  National University of Ireland, Galway (GPA: 4/4)
-
-  Graduation Year: 2020
-
-
-  Experience
-
-  Co-Founder & Software Engineer
-
-  CryptoWave Solutions (03/2021 - Present)
-
-  Location: Ireland | Industry: Blockchain Technology
-
-
-  Co-founded and led a startup specializing in app and software development with a
-  focus on blockchain technology
-
-  Provided blockchain consultations for 10+ companies, enhancing their software capabilities
-  with secure, decentralized solutions
-
-  Developed blockchain applications, integrated cutting-edge technology to meet client
-  needs and drive industry innovation
-
-  Research Intern
-
-  National University of Ireland, Galway (11/2022 - 03/2023)
-
-  Location: Galway, Ireland | Industry: IoT Security Research
-
-
-  Conducted in-depth research on IoT security, focusing on binary instrumentation
-  and runtime monitoring
-
-  Performed in-depth study of the MQTT protocol and Falco
-
-  Developed multiple software components including MQTT packet analysis library, Falco
-  adapter, and RML monitor in Prolog
-
-  Authored thesis "Binary Instrumentation for Runtime Monitoring of Internet of Things
-  Systems Using Falco"
-
-  Software Engineer
-
-  University Hospital Galway (05/2022 - 11/2022)
-
-  Location: Galway, Ireland | Industry: Healthcare IT
-
-
-  Integrated and enforced robust security protocols
-
-  Developed and maintained a critical software tool for password validation used by
-  over 1,600 employees
-
-  Played an integral role in the hospital''s cybersecurity team
-
-  Projects
-
-  JobBot
-
-  AI-driven tool to automate and personalize job applications on AIHawk, gained over
-  3000 stars on GitHub, improving efficiency and reducing application time
-
-  Link: JobBot
-
-
-  mqtt-packet-parser
-
-  Developed a Node.js module for parsing MQTT packets, improved parsing efficiency
-  by 40%
-
-  Link: mqtt-packet-parser
-
-
-  Achievements
-
-  Winner of an Irish public competition - Won first place in a public competition
-  with a perfect score of 70/70, securing a Software Developer position at University
-  Hospital Galway
-
-  Galway Merit Scholarship - Awarded annually from 2018 to 2020 in recognition of
-  academic excellence and contribution
-
-  GitHub Recognition - Gained over 3000 stars on GitHub with JobBot project
-
-  Certifications
-
-  C1
-
-
-  Languages
-
-  English - Native
-
-  Spanish - Professional
-
-  Interests
-
-  Full-Stack Development, Software Architecture, IoT system design and development,
-  Artificial Intelligence, Cloud Technologies
-
-
-  '
+_source_format: pdf
+raw_text: "ADAM GARD \nBaltimore, MD 21224 • (443) 617-4612 • adam.gard@alum.mit.edu\
+  \ \n\nEDUCATION  \nUniversity of Maryland – College Park, MD \n\n-  Master of Business\
+  \ Administration in Digital Transformation  \n\nMassachusetts Institute of Technology\
+  \ – Cambridge, MA \n\n-  Master of Applied Science in Supply Chain Management  \n\
+  \nStevenson University - Baltimore, MD    \n\n-  Bachelor of Science in Public History\
+  \  \n\nPROFESSIONAL EXPERIENCE   \n\nAug 2019 - May 2021 \n\nAug 2018 - May 2019\
+  \ \n\nAug 2009 - Dec 2013 \n\nEssilorLuxottica  \nSr. Logistics Manager, Supply\
+  \ Chain \n▪  Quantified temporal irregularity via centroidal variance per transaction\
+  \ type, revealing high-risk clusters with a \nresultant 40% reduction in cycle count\
+  \ adjustments during pilot, 15% forecast accuracy gain in high-variance \ncluster,\
+  \ and dynamic ABC reclassification using 2024 usage trends for optimized inventory\
+  \ control. \nBuilt RL + RAG AI agent (PPO + Grok-4) for heavy equipment maintenance\
+  \ support; auto-generates optimized work \norders, spare parts forecasts, and vendor\
+  \ RFQs from telemetry & failure data—cutting downtime 42%, emergency \nprocurement\
+  \ 37%, and MTTR 29%. \nLed cycle count program rollout across 9 manufacturing sites,\
+  \ achieving 100% policy compliance, ≥95% SKU \naccuracy, full ABCD coverage, and\
+  \ zero SOD conflicts through site-level execution, quarterly variance/root-cause\
+  \ \nreviews, and centralized corporate validation of all 36 quarterly reports. \n\
+  \nSep 2021 – Present  \nBaltimore, MD \n\n▪ \n\n▪ \n\n▪  Developed a phygital asset\
+  \ tracking solution leveraging NFTs with hosted metadata to bridge physical \n\n\
+  sustainment/maintenance items to blockchain, enabling secure fractional ownership,\
+  \ digital redemption, and \nimmutable lifecycle tracking. \n\n▪  Discerned human-computer\
+  \ interface (HCI) discrepancies within the organization’s legacy inventory management\
+  \ \n\nsoftware, resulting in more than $1.2 million in inventory variance tri-annually,\
+  \ and initiated process improvements \nthat reduced the discrepancy to $40 thousand\
+  \ within 90 days of entering the role. \n\n▪  Developed a vendor segmentation algorithm\
+  \ that ascertains criticality and service level acquisition over the \n\nprevious\
+  \ fiscal year to drive future contract negotiations, resulting in an overall organizational\
+  \ service level increase \nof 18%. \nImplemented a SKU-segmentation program derived\
+  \ from a hybridization of Machine Learning models and core \nSupply Chain fundamentals\
+  \ that reduced the overall amount of SKUs on-hand by 96.4% while maintaining a 98.3%\
+  \ \nconfidence against stock-outs.  \nRealized operational savings of $1.02mm by\
+  \ upskilling a team of 17 to fulfill the requirements of 31 attrition \nderived\
+  \ losses by fostering an environment that encourages learning and skill acquisition.\
+  \  \n\n▪ \n\n▪ \n\n▪  Utilized cost engineering practices to discern $142k worth\
+  \ of misallocated yearly funding between two reporting \n\n▪ \n\nsystems and $684k\
+  \ in total losses through direct sales to a competing vendor. \nConducted targeted\
+  \ data exploration and digital transformation to drive KPI improvements; reduced\
+  \ non-\nconforming products by 17%, improved service levels by 39% and reduced WIP\
+  \ by 1.8 days. \n\n▪  Developed the first environmentally responsible program for\
+  \ the disposal of discontinued and unwanted plastic \n\n▪ \n\n▪ \n\nlens products\
+  \ within the entirety of the EssilorLuxottica network, resulting in over $187k in\
+  \ organizational savings \nand 2.24 tons worth of plastic waste saved from the landfill\
+  \ over the course of the project. \nEngineered tools that predict production throughput\
+  \ and flow balancing while incorporating a Holt-Winter model, \nleading to a 16%\
+  \ reduction in organizational overtime. \nBuilt a machine learning derived adaptive\
+  \ Vendor Management model that the exceeds both ISO.13485 and \nISO.9001. Sought\
+  \ after by the proprietary ERP vendor as an external consultant for all inventory\
+  \ related functions, \nimproving average lead times to under 1.7 days. \n\n▪  Drove\
+  \ a $694k server integration project that required integration with 3 external IT\
+  \ vendors, 2 external ERP \n\nvendors, 4 business integrated partners and the allocation\
+  \ of 219 billable hours towards the development and \ninstallation of 5 virtual\
+  \ servers and 2 physical VX rail servers. \n\n \n \n \n \n \n \n \n \n \n \n   \
+  \             \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n\
+  \ \n \n\f▪  Demonstrated expertise in cost containment through meticulous expense\
+  \ control and analyzing EBITDA impacts, \n\nwhich improved operational control across\
+  \ logistics functions. \n\nExploration Architecture Corporation (XArc) \nBusiness\
+  \ Efficiency Analyst \n▪  Development of cost efficiency directive for a joint USDoD\
+  \ and Private Space venture that determines the optimal \nvehicle and location for\
+  \ sub-orbital Supply Chain operations, while focusing on cost-effective measures\
+  \ and launch \nvehicle optimization, particularly in the Aerospace and Defense industry.\
+  \ \nCollaborated with external contractors and clients while ensuring performance\
+  \ measurements streamlined logistics \nand improve facilities operations while enhancing\
+  \ global operational strategies through effective sourcing practices, \ncontributing\
+  \ to overall strategic planning and clear articulation of technical requirements\
+  \ and technical \nspecifications. \n\nOct 2020 – Present  \nVirtual \n\n▪ \n\nUnited\
+  \ States Army   \nSr. Operations Manager \n▪  Oversaw daily operations of a 781-member\
+  \ organization. This included: supervising a team of six middle managers, \n\nJan\
+  \ 2017 – May 2018  \nFort Campbell, KY \n\ncoordinating task completion between\
+  \ nine organizations, engaging with organization heads and operations \nmanagers,\
+  \ extending organizational influence among six external organizations and one higher\
+  \ organization, \nshowcasing a strong emphasis on guidance and motivating personnel.\
+  \ \nSimultaneously occupied the position of three senior managers for 75 days, demonstrating\
+  \ exceptional leadership \nand project management skills. \n\n▪ \n\n▪  Utilized\
+  \ indicators and benchmarks for effective assessment of operational goals while\
+  \ aligning with military policy \n\nand staffing initiatives. \nTrained 423 Soldiers\
+  \ over the course of three innovative exercises, receiving accolades from external\
+  \ hierarchies. \n▪ \n▪  Developed a future cost estimate and financial management\
+  \ plan for the maintenance budget of FY17, managing \n\nan overall total of $262,139\
+  \ allocated funds, ensuring timely delivery of mission-critical resources and feedback\
+  \ on \noperational effectiveness. \n\nUnited States Army  \nLogistics Manager \n\
+  ▪  Directly responsible for $4.3 million worth of unit owned equipment with 0% loss.\
+  \ Ran weekly maintenance \n\nFeb 2016 - Feb 2017  \nFort Campbell, KY  \n\nmeetings\
+  \ to over-view the battalion's equipment readiness. Managed 4,191 pieces of equipment;\
+  \ 231 pieces of \nrolling stock, 796 weapons and 929 communication systems and 59\
+  \ employees.  \nPlanned, managed and executed a large-scale event that cost $43,750\
+  \ and had 572 participants. \n\n▪ \n▪  Managed a maintenance team of 13 Soldiers\
+  \ that fixed 37 vehicles after a training rotation at Ft. Polk, LA over the \n\n\
+  ▪ \n\ncourse of 11 hours, saving the U.S. government an estimated $172,000 in contracted\
+  \ maintenance costs. \nConducted the US Army's first cargo shipping exercise in\
+  \ 16 years, moving 124 pieces of rolling stock and 27 \ncontainers between four\
+  \ installations with no damaged or lost equipment, utilizing multi-modal assets.\
+  \ \n\n▪  Multimodally deployed 542 personnel and 37 containers for national and\
+  \ international missions. \n\nUnited States Army  \nTransportation Manager \n▪ \n\
+  \nStrategic Mobility Officer for a top-tier special forces battalion, responsible\
+  \ for multi-modal logistical movements of \npersonnel and equipment. Moved 1,100\
+  \ tons of specialty equipment amongst eight military installations, Iraq and \n\
+  Afghanistan utilizing trucking, shipping and aerial modes with no loss or delayed\
+  \ arrivals. \n\n▪  Managed the movement of 207 personnel between 8 international\
+  \ locations and 9 states, while also managing over \n\n▪ \n\n$3,200,000 of appropriated\
+  \ funding.  \nCoordinated the movement of 215 personnel and 5,500 tons of equipment\
+  \ across three military installations, \ndeploying and re-deploying two EOD Companies\
+  \ using six C-17 Globemaster cargo planes. \n\nPROFESSIONAL CERTIFICATIONS \nCoding\
+  \ Proficiencies: Python, R, SQL, NoSQL, PIG, Pytorch, TensorFlow, Apache Spark,\
+  \ Hadoop \n\nFeb 2015 - Feb 2016  \nFort Campbell, KY  \n\n \n \n \n \n \n \n \n\
+  \ \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n\
+  \ \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n\
+  \ \n \n \n \n \n \n \n \n \n \n \n \n\f"

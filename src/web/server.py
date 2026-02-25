@@ -1,4 +1,6 @@
 import shutil
+import threading
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
@@ -24,6 +26,21 @@ from src.libs.resume_tailor import (
     ResumeTailor, list_tailored_resumes, load_tailored_resume,
 )
 from src.logging import logger
+
+# ---------------------------------------------------------------------------
+# Global state for batch logging
+# ---------------------------------------------------------------------------
+batch_logs = []
+batch_active = False
+
+def batch_log_sink(message):
+    global batch_logs
+    # Capture the plain text message, avoiding ANSI colors
+    record = message.record
+    log_line = f"{record['time'].strftime('%H:%M:%S')} | {record['level'].name: <5} | {record['message']}"
+    batch_logs.append(log_line)
+    if len(batch_logs) > 500:
+        batch_logs.pop(0)
 
 # ---------------------------------------------------------------------------
 # Pydantic models
@@ -60,7 +77,7 @@ class EmailConfigRequest(BaseModel):
 # App setup
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="AIHawk Web", version="0.6.0")
+app = FastAPI(title="AIHawk Web", version="0.7.0")
 static_dir = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
@@ -174,7 +191,7 @@ def index():
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "version": "0.6.0"}
+    return {"status": "ok", "version": "0.7.0"}
 
 
 @app.get("/api/stats")
@@ -236,43 +253,71 @@ async def upload_resume(file: UploadFile = File(...)):
 # Batch application run
 # ---------------------------------------------------------------------------
 
+def _run_batch_thread(payload: RunBatchRequest):
+    global batch_active, batch_logs
+    sink_id = None
+    try:
+        # Clear previous logs
+        batch_logs = []
+        batch_active = True
+        
+        # Add a custom sink that captures logs JUST for this thread
+        # We filter by checking if it's the current thread or if it's from the bot modules
+        sink_id = logger.add(batch_log_sink, format="{time:HH:mm:ss} | {message}", level="INFO")
+        
+        logger.info(f"🚀 Initializing {payload.platform} batch...")
+        config, secrets, llm_api_key = _load_runtime()
+
+        if payload.positions:
+            config["positions"] = payload.positions
+        else:
+            resume_positions = extract_positions(RESUME_PATH) if RESUME_PATH.exists() else []
+            if resume_positions:
+                config["positions"] = resume_positions
+
+        if payload.locations:
+            config["locations"] = payload.locations
+        if payload.min_suitability_score is not None:
+            config["min_suitability_score"] = payload.min_suitability_score
+        config["dry_run"] = payload.dry_run
+
+        manager = BotManager(secrets=secrets, config=config, llm_api_key=llm_api_key)
+
+        if payload.platform == "all":
+            logger.info("Starting LinkedIn segment...")
+            manager.run_batch("linkedin", payload.count)
+            logger.info("Starting Indeed segment...")
+            manager.run_batch("indeed", payload.count)
+        else:
+            manager.run_batch(payload.platform, payload.count)
+        
+        logger.info("✅ Batch completed successfully.")
+    except Exception as e:
+        logger.error(f"❌ Batch failed: {str(e)}")
+    finally:
+        batch_active = False
+        if sink_id is not None:
+            logger.remove(sink_id)
+
 @app.post("/api/run-batch")
 def run_batch(payload: RunBatchRequest):
-    config, secrets, llm_api_key = _load_runtime()
+    global batch_active
+    if batch_active:
+        raise HTTPException(status_code=400, detail="A batch is already running.")
+    
+    thread = threading.Thread(target=_run_batch_thread, args=(payload,))
+    thread.daemon = True
+    thread.start()
+    
+    return {"status": "started", "message": "Batch process started in background."}
 
-    if payload.positions:
-        config["positions"] = payload.positions
-    else:
-        resume_positions = extract_positions(RESUME_PATH) if RESUME_PATH.exists() else []
-        if resume_positions:
-            config["positions"] = resume_positions
 
-    if payload.locations:
-        config["locations"] = payload.locations
-    if payload.min_suitability_score is not None:
-        config["min_suitability_score"] = payload.min_suitability_score
-    config["dry_run"] = payload.dry_run
-
-    positions_used = config.get("positions", [])
-    manager = BotManager(secrets=secrets, config=config, llm_api_key=llm_api_key)
-
-    if payload.platform == "all":
-        li = manager.run_batch("linkedin", payload.count)
-        in_ = manager.run_batch("indeed", payload.count)
-        return {
-            "platform": "all",
-            "linkedin_applied": li, "indeed_applied": in_,
-            "total_applied": li + in_,
-            "positions_targeted": positions_used,
-            "ats_scoring": "automatic — every job scored & resume tailored before applying",
-        }
-
-    applied = manager.run_batch(payload.platform, payload.count)
+@app.get("/api/batch-status")
+def get_batch_status():
+    global batch_active, batch_logs
     return {
-        "platform": payload.platform,
-        "applied": applied,
-        "positions_targeted": positions_used,
-        "ats_scoring": "automatic — every job scored & resume tailored before applying",
+        "running": batch_active,
+        "logs": batch_logs
     }
 
 
@@ -400,7 +445,8 @@ def set_email_config(payload: EmailConfigRequest):
         raise HTTPException(
             status_code=400,
             detail=(
-                "Could not connect to IMAP server. For Gmail use imap.gmail.com:993 with SSL and a 16-character App Password."
+                "Authentication failed. NOTE: You MUST use a 16-character 'App Password' for Gmail (e.g. xxxx xxxx xxxx xxxx), "
+                "not your regular account password. Regular passwords like 'Fwizzle1' will be rejected by Google's security."
             ),
         )
 
