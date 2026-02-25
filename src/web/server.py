@@ -428,6 +428,38 @@ def scan_email(hours: int = 48):
     events = monitor.scan_since(hours=hours)
     classified = EmailMonitor.events_to_list(events)
 
+    # -----------------------------------------------------------------------
+    # Auto-update Pipeline Tracker based on classified emails
+    # -----------------------------------------------------------------------
+    tailored_resumes = list_tailored_resumes()
+    auto_updated = []
+    tailor = ResumeTailor()
+
+    for event in classified:
+        if event["classification"] == "unknown":
+            continue
+
+        company_hint = event.get("company_hint", "").lower()
+        if not company_hint:
+            continue
+
+        # Try to find a matching pending job
+        for tr in tailored_resumes:
+            if tr.status != "pending":
+                continue
+            
+            # Simple substring match for company
+            if company_hint in tr.company.lower() or tr.company.lower() in company_hint:
+                if event["classification"] == "rejection":
+                    tailor.discard(tr)
+                    auto_updated.append({"job_id": tr.job_id, "company": tr.company, "status": "discarded"})
+                    event["auto_matched"] = tr.job_id
+                elif event["classification"] == "pipeline":
+                    tailor.confirm(tr)
+                    auto_updated.append({"job_id": tr.job_id, "company": tr.company, "status": "confirmed"})
+                    event["auto_matched"] = tr.job_id
+                break
+
     rejections = [e for e in classified if e["classification"] == "rejection"]
     pipelines  = [e for e in classified if e["classification"] == "pipeline"]
 
@@ -436,4 +468,6 @@ def scan_email(hours: int = 48):
         "rejections": rejections,
         "pipeline_updates": pipelines,
         "unknown": [e for e in classified if e["classification"] == "unknown"],
+        "auto_updated_count": len(auto_updated),
+        "auto_updated_jobs": auto_updated
     }
