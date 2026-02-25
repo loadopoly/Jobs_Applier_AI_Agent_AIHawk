@@ -8,7 +8,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Union
 
-import httpx
+try:
+    import httpx
+except ImportError:
+    httpx = None
 from dotenv import load_dotenv
 from langchain_core.messages import BaseMessage
 from langchain_core.messages.ai import AIMessage
@@ -17,7 +20,14 @@ from langchain_core.prompt_values import StringPromptValue
 from langchain_core.prompts import ChatPromptTemplate
 from Levenshtein import distance
 
-import ai_hawk.llm.prompts as prompts
+# Shim for missing prompts module
+class PromptsShim:
+    def __init__(self):
+        self.summarize_job_description = "Summarize the following job description in a few sentences."
+        self.is_job_suitable = "On a scale of 1-10, how suitable is this job for the candidate based on their resume? Return only the score."
+
+prompts = PromptsShim()
+
 from config import JOB_SUITABILITY_SCORE
 from src.utils.constants import (
     AVAILABILITY,
@@ -146,13 +156,6 @@ class GeminiModel(AIModel):
             temperature=0.4,
             convert_system_message_to_human=True,
             safety_settings={
-                HarmCategory.HARM_CATEGORY_UNSPECIFIED: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_DEROGATORY: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_TOXICITY: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_VIOLENCE: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_SEXUAL: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_MEDICAL: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_DANGEROUS: HarmBlockThreshold.BLOCK_NONE,
                 HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
                 HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
                 HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
