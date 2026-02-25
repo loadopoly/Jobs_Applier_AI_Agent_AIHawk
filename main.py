@@ -16,6 +16,7 @@ import json
 from src.libs.resume_and_cover_builder import ResumeFacade, ResumeGenerator, StyleManager
 from src.inbox.service import InboxScanService
 from src.application_stats import ApplicationStatsService
+from src.bots.bot_manager import BotManager
 from src.resume_schemas.job_application_profile import JobApplicationProfile
 from src.resume_schemas.resume import Resume
 from src.logging import logger
@@ -549,20 +550,159 @@ def scan_email_inbox(parameters: dict):
         raise
 
 
+def generate_recruiter_briefing(parameters: dict, llm_api_key: str):
+    """Generate a briefing card for a recruiter conversation."""
+    try:
+        questions = [
+            inquirer.Text("company", message="Enter Company Name:"),
+            inquirer.Text("role", message="Enter Job Role/Title:"),
+        ]
+        answers = inquirer.prompt(questions)
+        company = answers.get("company")
+        role = answers.get("role")
+        
+        if not company or not role:
+            logger.warning("Company and Role are required.")
+            return
+
+        from src.libs.recruiter_prep import RecruiterPrepEngine
+        from src.libs.llm_manager import AIAdapter
+        
+        ai_adapter = AIAdapter(parameters, llm_api_key)
+        engine = RecruiterPrepEngine(ai_adapter)
+        
+        resume_path = parameters["uploads"]["plainTextResume"]
+        briefing = engine.generate_briefing(company, role, resume_path)
+        
+        print("\n--- RECRUITER BRIEFING CARD ---")
+        print(json.dumps(briefing, indent=2))
+        print("-------------------------------\n")
+        logger.info(f"Briefing card generated for {company}.")
+    except Exception as e:
+        logger.exception(f"Failed to generate recruiter briefing: {e}")
+
+
+def analyze_job_match(parameters: dict, llm_api_key: str):
+    """Analyze a job description against the resume using ATS scoring."""
+    try:
+        questions = [
+            inquirer.List(
+                "source",
+                message="Where is the job description?",
+                choices=["Latest Application", "Paste Text"],
+                default="Latest Application",
+            )
+        ]
+        answer = inquirer.prompt(questions)
+        source = answer.get("source")
+        
+        description = ""
+        if source == "Latest Application":
+            apps_dir = Path("job_applications")
+            if not apps_dir.exists():
+                print("No applications found.")
+                return
+            dirs = sorted(apps_dir.glob("*"), key=lambda d: d.stat().st_mtime, reverse=True)
+            if not dirs:
+                print("No applications found.")
+                return
+            jd_path = dirs[0] / "job_description.json"
+            if jd_path.exists():
+                with open(jd_path, 'r') as f:
+                    data = json.load(f)
+                    description = data.get("description", "")
+        else:
+            questions = [inquirer.Editor("description", message="Paste the job description:")]
+            # Note: Editor might not work in some terminals, could fallback to Text
+            answer = inquirer.prompt(questions)
+            description = answer.get("description", "")
+
+        if not description:
+            print("No job description found/provided.")
+            return
+
+        from src.libs.ats_scorer import ATSScorer
+        from src.libs.llm_manager import AIAdapter
+        
+        ai_adapter = AIAdapter(parameters, llm_api_key)
+        scorer = ATSScorer(ai_adapter)
+        
+        resume_path = parameters["uploads"]["plainTextResume"]
+        analysis = scorer.score_job(resume_path, description)
+        
+        print("\n--- ATS SCORE REPORT ---")
+        print(f"Match Score: {analysis.get('score', 0)}/100")
+        print(f"Summary: {analysis.get('match_summary', '')}")
+        print("\nTop Missing Keywords:", ", ".join(analysis.get("missing_keywords", [])))
+        print("\nSurvival Tweaks (High ROI):")
+        for tweak in analysis.get("survival_tweaks", []):
+            print(f" - {tweak}")
+        print("------------------------\n")
+        logger.info("ATS analysis completed.")
+    except Exception as e:
+        logger.exception(f"ATS analysis failed: {e}")
+
+
 def summarize_application_results(parameters: dict):
     """Summarize applied jobs and classify outcomes into success/failure buckets."""
     try:
         applications_dir = Path("job_applications")
-        stats = ApplicationStatsService(applications_dir=applications_dir).summarize()
+        stats = ApplicationStatsService(applications_dir).summarize()
 
-        summary_text = {
-            "applications_directory": str(applications_dir.resolve()),
-            **stats.as_dict(),
+        summary = {
+            "total_jobs": stats.total_jobs,
+            "successes": stats.successes,
+            "failures": stats.failures,
+            "unknown": stats.unknown,
         }
-        print(json.dumps(summary_text, indent=2))
-        logger.info("Application summary generated successfully.")
+        print(json.dumps(summary, indent=2))
+        logger.info("Application summary completed successfully.")
     except Exception as e:
         logger.exception(f"Failed to summarize application results: {e}")
+        raise
+
+
+def run_application_bot(parameters: dict, llm_api_key: str):
+    """Start the automated job application process (LinkedIn)."""
+    try:
+        questions = [
+            inquirer.List(
+                "platform",
+                message="Select platform to apply on:",
+                choices=["LinkedIn", "Indeed (Work in Progress)", "All"],
+                default="LinkedIn",
+            ),
+            inquirer.Text(
+                "count",
+                message="How many jobs should JobHawk apply to in this batch?",
+                default="5",
+            )
+        ]
+        answers = inquirer.prompt(questions) or {}
+        platform = answers.get("platform", "LinkedIn")
+        count_raw = answers.get("count", "5")
+        
+        try:
+            count = int(count_raw)
+        except ValueError:
+            count = 5
+            
+        secrets_file = parameters.get("secretsFile")
+        secrets = ConfigValidator.load_yaml(secrets_file)
+        
+        manager = BotManager(secrets=secrets, config=parameters, llm_api_key=llm_api_key)
+        
+        if platform == "LinkedIn":
+            manager.run_batch("linkedin", count=count)
+        elif platform == "Indeed (Work in Progress)":
+            manager.run_batch("indeed", count=count)
+        elif platform == "All":
+            manager.run_batch("linkedin", count=count)
+            manager.run_batch("indeed", count=count)
+            
+        logger.info("Batch application run completed.")
+    except Exception as e:
+        logger.exception(f"Bot application run failed: {e}")
         raise
 
         
@@ -605,6 +745,18 @@ def handle_inquiries(selected_actions: List[str], parameters: dict, llm_api_key:
             if "Summarize Job Application Results" == selected_actions:
                 logger.info("Summarizing job applications with successes and failures...")
                 summarize_application_results(parameters)
+                
+            if "Start Application Bot (Auto-Apply)" == selected_actions:
+                logger.info("Starting automated job applications...")
+                run_application_bot(parameters, require_llm_key())
+                
+            if "ATS Scorer (Analyze Job Match)" == selected_actions:
+                logger.info("Analyzing job suitability...")
+                analyze_job_match(parameters, require_llm_key())
+
+            if "Generate Recruiter Briefing Card" == selected_actions:
+                logger.info("Preparing for recruiter conversation...")
+                generate_recruiter_briefing(parameters, require_llm_key())
 
         else:
             logger.warning("No actions selected. Nothing to execute.")
@@ -625,6 +777,9 @@ def prompt_user_action() -> str:
                 message="Select the action you want to perform:",
                 choices=[
                     "Generate Resume",
+                    "Start Application Bot (Auto-Apply)",
+                    "ATS Scorer (Analyze Job Match)",
+                    "Generate Recruiter Briefing Card",
                     "Generate Resume Tailored for Job Description",
                     "Generate Tailored Cover Letter for Job Description",
                     "Scan Inbox for Rejections/Recruiters/Interviews",

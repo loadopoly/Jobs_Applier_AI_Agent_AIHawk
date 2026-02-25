@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>AIHawk Control Panel</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box}
+    body{font-family:Arial,sans-serif;margin:0;background:#f0f2f7;color:#1f2937}
+    .wrap{max-width:1200px;margin:24px auto;padding:0 16px}
+    h1{margin-bottom:4px;font-size:1.6rem}
+    .subtitle{color:#6b7280;margin-bottom:20px;font-size:.95rem}
+    h2{font-size:1rem;margin:0 0 6px;color:#374151}
+    .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
+    .row2b{display:grid;grid-template-columns:340px 1fr;gap:16px;margin-bottom:16px}
+    .row-full{margin-bottom:16px}
+    .card{background:#fff;border-radius:12px;padding:18px;box-shadow:0 1px 8px rgba(0,0,0,.07)}
+    label{display:block;margin-top:10px;font-size:13px;font-weight:600;color:#374151}
+    input,textarea,select{width:100%;margin-top:4px;padding:9px 11px;border-radius:8px;border:1px solid #d1d5db;font-size:13px}
+    input:focus,textarea:focus,select:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+    button{width:100%;margin-top:12px;padding:10px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:600;background:#2563eb;color:#fff;transition:background .15s}
+    button:hover{background:#1d4ed8}
+    button.ok{background:#16a34a}button.ok:hover{background:#15803d}
+    button.danger{background:#dc2626}button.danger:hover{background:#b91c1c}
+    button.secondary{background:#6b7280}button.secondary:hover{background:#4b5563}
+    button.sm{padding:5px 12px;margin-top:0;font-size:12px;width:auto;border-radius:6px}
+    pre{background:#111827;color:#d1fae5;padding:12px;border-radius:8px;overflow:auto;font-size:12px;min-height:60px;white-space:pre-wrap;word-break:break-word}
+    .chip-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+    .chip{background:#eff6ff;color:#1d4ed8;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
+    .chip.skill{background:#f0fdf4;color:#166534}
+    .chip.warn{background:#fef9c3;color:#854d0e}
+    .chip.ok{background:#f0fdf4;color:#166534}
+    .chip.rej{background:#fef2f2;color:#991b1b}
+    .chip.pip{background:#ecfdf5;color:#065f46}
+    .badge{display:inline-block;padding:6px 10px;font-size:12px;margin-top:8px;width:100%;border-radius:8px;border:1px solid}
+    .badge.info{background:#f0f9ff;color:#0369a1;border-color:#bae6fd}
+    .badge.ok{background:#f0fdf4;color:#166534;border-color:#bbf7d0}
+    .badge.err{background:#fef2f2;color:#991b1b;border-color:#fecaca}
+    .divider{border:none;border-top:1px solid #e5e7eb;margin:12px 0}
+    .tag{font-size:11px;color:#9ca3af;font-weight:normal}
+    .upload-zone{border:2px dashed #d1d5db;border-radius:8px;padding:14px;text-align:center;cursor:pointer;margin-top:8px;transition:border-color .2s,background .2s}
+    .upload-zone:hover,.upload-zone.drag-over{border-color:#2563eb;background:#eff6ff}
+    .upload-zone input[type=file]{display:none}
+    .upload-zone p{margin:0;font-size:13px;color:#6b7280}
+    .upload-zone strong{color:#2563eb}
+    /* Pipeline table */
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+    th{background:#f9fafb;padding:7px 10px;text-align:left;border-bottom:2px solid #e5e7eb;font-weight:700;color:#374151}
+    td{padding:7px 10px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+    tr:hover td{background:#f9fafb}
+    .status-pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}
+    .status-pill.pending{background:#fef9c3;color:#854d0e}
+    .status-pill.confirmed{background:#d1fae5;color:#065f46}
+    .status-pill.discarded{background:#fee2e2;color:#991b1b}
+    /* Email events */
+    .email-event{border:1px solid #e5e7eb;border-radius:8px;padding:10px;margin-top:8px}
+    .email-event.rejection{border-color:#fca5a5;background:#fef2f2}
+    .email-event.pipeline{border-color:#6ee7b7;background:#ecfdf5}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>AIHawk Control Panel v0.6.0</h1>
+  <p class="subtitle">Resume-driven automation — ATS scored & tailored before every application.</p>
+
+  <!-- ROW 1: Resume + Batch -->
+  <div class="row2b">
+    <!-- Resume Card -->
+    <section class="card">
+      <h2>📄 Your Resume</h2>
+      <div id="resumeSummary"><div class="chip-list"><span class="chip warn">Loading…</span></div></div>
+      <hr class="divider"/>
+      <label>Upload resume <span class="tag">PDF · DOCX · TXT · RTF · YAML</span></label>
+      <div class="upload-zone" id="uploadZone" onclick="document.getElementById('resumeFile').click()">
+        <input type="file" id="resumeFile" accept=".pdf,.docx,.doc,.txt,.rtf,.yaml,.yml" onchange="handleResumeFile(event)"/>
+        <p>Drag &amp; drop or click — <strong>any format accepted</strong></p>
+      </div>
+      <button onclick="uploadResume()" id="uploadBtn" style="display:none" class="secondary">⬆ Upload &amp; Activate</button>
+      <div id="uploadMsg"></div>
+    </section>
+
+    <!-- Batch Card -->
+    <section class="card">
+      <h2>🚀 Run Application Batch</h2>
+      <div class="badge info" style="margin-top:0">
+        Every job is <strong>ATS scored</strong> against your resume first.
+        Passing jobs get a <strong>tailored resume</strong> generated before applying.
+        Only jobs ≥ Min ATS Score proceed.
+      </div>
+      <div class="row2" style="margin-top:10px">
+        <div>
+          <label>Platform</label>
+          <select id="platform">
+            <option value="linkedin">LinkedIn</option>
+            <option value="indeed">Indeed</option>
+            <option value="all">All</option>
+          </select>
+        </div>
+        <div>
+          <label>Mode</label>
+          <select id="dryRun">
+            <option value="true">Dry Run (safe)</option>
+            <option value="false">Live Apply</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div><label>Count</label><input id="count" type="number" value="5" min="1" max="100"/></div>
+        <div><label>Min ATS Score</label><input id="minScore" type="number" value="70" min="0" max="100"/></div>
+      </div>
+      <label>Target Positions <span class="tag">— auto-loaded from resume; edit to override</span></label>
+      <input id="positions" placeholder="Loading from resume…"/>
+      <label>Locations (comma separated)</label>
+      <input id="locations" value="United States,Remote"/>
+      <button onclick="runBatch()">▶ Start Batch</button>
+    </section>
+  </div>
+
+  <!-- ROW 2: ATS Preview + Recruiter Briefing + Stats -->
+  <div class="row3">
+    <section class="card">
+      <h2>🔍 Manual ATS Preview</h2>
+      <div class="badge info" style="margin-top:0;font-size:11px">Same scoring runs automatically for every batch job.</div>
+      <label style="margin-top:10px">Job Description</label>
+      <textarea id="jd" rows="7" placeholder="Paste JD here…"></textarea>
+      <button onclick="runAts()">Analyze Match</button>
+    </section>
+
+    <section class="card">
+      <h2>🗂 Recruiter Briefing</h2>
+      <label>Company</label><input id="company" placeholder="Acme Logistics"/>
+      <label>Role</label><input id="role" placeholder="Operations Manager"/>
+      <button onclick="runBriefing()">Generate Briefing</button>
+    </section>
+
+    <section class="card">
+      <h2>📊 Application Stats</h2>
+      <button onclick="loadStats()" class="secondary">Refresh</button>
+      <pre id="statsOut" style="margin-top:10px"></pre>
+    </section>
+  </div>
+
+  <!-- ROW 3: Pipeline Tracker -->
+  <section class="card row-full">
+    <h2>📋 Pipeline Tracker <span class="tag">(tailored resumes by job)</span>
+      <button onclick="loadPipeline()" class="sm secondary" style="margin-left:10px">↻ Refresh</button>
+    </h2>
+    <div id="pipelineTable"><em style="color:#9ca3af;font-size:13px">No tailored resumes yet — run a batch first.</em></div>
+  </section>
+
+  <!-- ROW 4: Email Inbox -->
+  <div class="row2" style="margin-bottom:16px">
+    <!-- Email Config -->
+    <section class="card">
+      <h2>📧 Email Inbox Setup</h2>
+      <div class="badge info" style="margin-top:0;font-size:11px">Connect your email so rejection &amp; pipeline updates are auto-detected.</div>
+      <div id="emailConfigStatus"></div>
+      <label>IMAP Host</label><input id="imapHost" placeholder="imap.gmail.com"/>
+      <div class="row2">
+        <div><label>Port</label><input id="imapPort" type="number" value="993"/></div>
+        <div><label>SSL</label>
+          <select id="imapSsl" style="margin-top:4px"><option value="true">Yes (recommended)</option><option value="false">No</option></select>
+        </div>
+      </div>
+      <label>Email Address</label><input id="emailAddr" type="email" placeholder="you@gmail.com"/>
+      <label>App Password <span class="tag">(use app-specific password, not main login)</span></label>
+      <input id="emailPass" type="password" placeholder="••••••••"/>
+      <button onclick="saveEmailConfig()">💾 Save &amp; Test Connection</button>
+    </section>
+
+    <!-- Email Scan -->
+    <section class="card">
+      <h2>📬 Email Scan Results</h2>
+      <div class="row2" style="margin-top:0">
+        <div><label>Scan window (hours)</label><input id="scanHours" type="number" value="48" min="1"/></div>
+        <div style="display:flex;align-items:flex-end"><button onclick="scanEmail()" class="ok" style="margin-bottom:0">🔍 Scan Inbox</button></div>
+      </div>
+      <div id="emailResults" style="margin-top:10px">
+        <em style="color:#9ca3af;font-size:13px">Click Scan Inbox to check for rejections &amp; pipeline updates.</em>
+      </div>
+    </section>
+  </div>
+
+  <!-- Output -->
+  <section class="card row-full">
+    <h2>Output</h2>
+    <pre id="output">Ready.</pre>
+  </section>
+</div>
+
+<script>
+const output=document.getElementById('output');
+const statsOut=document.getElementById('statsOut');
+let pendingResumeFile=null;
+
+function show(d){output.textContent=JSON.stringify(d,null,2)}
+
+async function api(path,body){
+  const res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d=await res.json();
+  if(!res.ok)throw new Error(JSON.stringify(d));
+  return d;
+}
+
+// ── Resume summary ────────────────────────────────────────────────────────
+async function loadResumeSummary(){
+  const box=document.getElementById('resumeSummary');
+  try{
+    const r=await fetch('/api/resume');
+    if(!r.ok){box.innerHTML='<span class="chip warn">No resume uploaded yet</span>';return;}
+    const d=await r.json();
+    let html='';
+    if(!d.has_real_data){
+      html='<span class="chip warn">⚠ Template placeholders — upload your real resume</span>';
+    } else {
+      html=`<strong>${d.name}</strong>&nbsp;<span class="tag">${d.experience_count} role${d.experience_count===1?'':'s'}`;
+      if(d.source_format&&d.source_format!=='yaml') html+=` · source: .${d.source_format}`;
+      html+='</span>';
+    }
+    if(d.positions&&d.positions.length){
+      html+='<div class="chip-list" style="margin-top:6px">';
+      d.positions.forEach(p=>{html+=`<span class="chip">${p}</span>`;});
+      html+='</div>';
+      document.getElementById('positions').value=d.positions.join(', ');
+    }
+    if(d.skills&&d.skills.length){
+      html+='<p style="margin:6px 0 2px;font-size:12px;color:#6b7280">Skills:</p><div class="chip-list">';
+      d.skills.slice(0,12).forEach(s=>{html+=`<span class="chip skill">${s}</span>`;});
+      if(d.skills.length>12)html+=`<span class="chip skill">+${d.skills.length-12} more</span>`;
+      html+='</div>';
+    }
+    box.innerHTML=html;
+  }catch(e){box.innerHTML='<span class="chip warn">Could not load resume</span>';}
+}
+
+// ── Resume upload ─────────────────────────────────────────────────────────
+function handleResumeFile(evt){
+  const f=evt.target.files[0];if(!f)return;
+  pendingResumeFile=f;
+  document.getElementById('uploadZone').querySelector('p').innerHTML=`Selected: <strong>${f.name}</strong>`;
+  document.getElementById('uploadBtn').style.display='block';
+}
+const zone=document.getElementById('uploadZone');
+zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag-over');});
+zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));
+zone.addEventListener('drop',e=>{
+  e.preventDefault();zone.classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];
+  if(f){pendingResumeFile=f;zone.querySelector('p').innerHTML=`Selected: <strong>${f.name}</strong>`;document.getElementById('uploadBtn').style.display='block';}
+});
+async function uploadResume(){
+  if(!pendingResumeFile)return;
+  const btn=document.getElementById('uploadBtn'),msg=document.getElementById('uploadMsg');
+  btn.textContent='Uploading…';btn.disabled=true;
+  try{
+    const form=new FormData();form.append('file',pendingResumeFile);
+    const res=await fetch('/api/upload-resume',{method:'POST',body:form});
+    const d=await res.json();
+    if(!res.ok)throw new Error(JSON.stringify(d));
+    msg.innerHTML=`<div class="badge ok">✓ Resume uploaded (${d.source_format||'yaml'})</div>`;
+    pendingResumeFile=null;btn.style.display='none';
+    await loadResumeSummary();show(d);
+  }catch(e){
+    msg.innerHTML=`<div class="badge err">✗ ${e.message}</div>`;
+  }finally{btn.textContent='⬆ Upload & Activate';btn.disabled=false;}
+}
+
+// ── Batch ─────────────────────────────────────────────────────────────────
+async function runBatch(){
+  try{
+    const positions=document.getElementById('positions').value.split(',').map(v=>v.trim()).filter(Boolean);
+    const locations=document.getElementById('locations').value.split(',').map(v=>v.trim()).filter(Boolean);
+    const payload={
+      platform:document.getElementById('platform').value,
+      count:Number(document.getElementById('count').value||5),
+      dry_run:document.getElementById('dryRun').value==='true',
+      min_suitability_score:Number(document.getElementById('minScore').value||70),
+      positions:positions.length?positions:undefined,
+      locations:locations.length?locations:undefined,
+    };
+    show(await api('/api/run-batch',payload));
+    await loadStats();await loadPipeline();
+  }catch(e){show({error:String(e)});}
+}
+
+// ── ATS ───────────────────────────────────────────────────────────────────
+async function runAts(){
+  try{show(await api('/api/ats-score',{job_description:document.getElementById('jd').value}));}
+  catch(e){show({error:String(e)});}
+}
+
+// ── Briefing ──────────────────────────────────────────────────────────────
+async function runBriefing(){
+  try{show(await api('/api/recruiter-briefing',{company:document.getElementById('company').value,role:document.getElementById('role').value}));}
+  catch(e){show({error:String(e)});}
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────
+async function loadStats(){
+  try{const r=await fetch('/api/stats');statsOut.textContent=JSON.stringify(await r.json(),null,2);}
+  catch(e){statsOut.textContent='Error loading stats.';}
+}
+
+// ── Pipeline Tracker ──────────────────────────────────────────────────────
+async function loadPipeline(){
+  const box=document.getElementById('pipelineTable');
+  try{
+    const r=await fetch('/api/tailored-resumes');
+    const d=await r.json();
+    const resumes=d.resumes||[];
+    if(!resumes.length){box.innerHTML='<em style="color:#9ca3af;font-size:13px">No tailored resumes yet — run a batch first.</em>';return;}
+    let html=`<table><thead><tr>
+      <th>Company</th><th>Role</th><th>ATS Score</th><th>Status</th><th>Created</th><th>Actions</th>
+    </tr></thead><tbody>`;
+    resumes.forEach(tr=>{
+      const pill=`<span class="status-pill ${tr.status}">${tr.status}</span>`;
+      const created=tr.created_at?tr.created_at.slice(0,16).replace('T',' '):'—';
+      let actions='';
+      if(tr.status==='pending'){
+        actions+=`<button class="sm ok" onclick="confirmPipeline('${tr.job_id}')">✓ Confirm</button> `;
+        actions+=`<button class="sm danger" onclick="rejectPipeline('${tr.job_id}')">✗ Reject</button>`;
+      }
+      if(tr.status==='confirmed'&&tr.pdf){
+        actions+=`<a href="/api/tailored-resumes/${tr.job_id}/pdf" target="_blank"><button class="sm" style="background:#7c3aed">⬇ Resume PDF</button></a> `;
+        actions+=`<a href="/api/tailored-resumes/${tr.job_id}/highlights" target="_blank"><button class="sm secondary">📝 Highlights</button></a>`;
+      }
+      html+=`<tr><td>${tr.company}</td><td>${tr.job_title}</td><td>${tr.ats_score}</td><td>${pill}</td><td>${created}</td><td>${actions||'—'}</td></tr>`;
+    });
+    html+='</tbody></table>';
+    box.innerHTML=html;
+  }catch(e){box.innerHTML=`<span class="chip warn">Error loading pipeline: ${e.message}</span>`;}
+}
+
+async function confirmPipeline(jobId){
+  try{show(await api(`/api/pipeline/${jobId}/confirm`,{}));await loadPipeline();}
+  catch(e){show({error:String(e)});}
+}
+async function rejectPipeline(jobId){
+  try{show(await api(`/api/pipeline/${jobId}/reject`,{}));await loadPipeline();}
+  catch(e){show({error:String(e)});}
+}
+
+// ── Email Config ──────────────────────────────────────────────────────────
+async function loadEmailConfigStatus(){
+  const box=document.getElementById('emailConfigStatus');
+  try{
+    const r=await fetch('/api/email/config');
+    const d=await r.json();
+    if(d.configured){
+      box.innerHTML=`<div class="badge ok">✓ Connected: ${d.email_address} via ${d.imap_host}</div>`;
+      document.getElementById('imapHost').value=d.imap_host||'';
+      document.getElementById('emailAddr').value=d.email_address||'';
+    } else {
+      box.innerHTML='<div class="badge info">Not configured yet.</div>';
+    }
+  }catch(e){}
+}
+
+async function saveEmailConfig(){
+  const cfg={
+    imap_host:document.getElementById('imapHost').value,
+    imap_port:Number(document.getElementById('imapPort').value||993),
+    email_address:document.getElementById('emailAddr').value,
+    password:document.getElementById('emailPass').value,
+    use_ssl:document.getElementById('imapSsl').value==='true',
+  };
+  try{
+    show(await api('/api/email/config',cfg));
+    await loadEmailConfigStatus();
+  }catch(e){show({error:String(e)});}
+}
+
+// ── Email Scan ────────────────────────────────────────────────────────────
+async function scanEmail(){
+  const box=document.getElementById('emailResults');
+  const hours=Number(document.getElementById('scanHours').value||48);
+  box.innerHTML='<em style="color:#6b7280;font-size:13px">Scanning…</em>';
+  try{
+    const r=await fetch(`/api/email/scan?hours=${hours}`);
+    const d=await r.json();
+    if(!r.ok)throw new Error(JSON.stringify(d));
+    let html=`<p style="font-size:12px;color:#6b7280;margin:0 0 8px">${d.scanned} message(s) scanned</p>`;
+    if(d.rejections&&d.rejections.length){
+      html+='<p style="margin:4px 0;font-weight:600;font-size:12px;color:#991b1b">⛔ Rejections ('+d.rejections.length+')</p>';
+      d.rejections.forEach(e=>{
+        html+=`<div class="email-event rejection"><strong>${e.subject||'(no subject)'}</strong><br>
+          <span style="font-size:11px;color:#6b7280">${e.sender} · ${e.date||''}</span>
+          <p style="margin:4px 0 0;font-size:12px">${e.snippet}</p></div>`;
+      });
+    }
+    if(d.pipeline_updates&&d.pipeline_updates.length){
+      html+='<p style="margin:8px 0 4px;font-weight:600;font-size:12px;color:#065f46">🚀 Pipeline Updates ('+d.pipeline_updates.length+')</p>';
+      d.pipeline_updates.forEach(e=>{
+        html+=`<div class="email-event pipeline"><strong>${e.subject||'(no subject)'}</strong><br>
+          <span style="font-size:11px;color:#6b7280">${e.sender} · ${e.date||''}</span>
+          <p style="margin:4px 0 0;font-size:12px">${e.snippet}</p></div>`;
+      });
+    }
+    if(!d.rejections.length&&!d.pipeline_updates.length){
+      html+='<div class="badge info">No rejections or pipeline updates in the last '+hours+'h.</div>';
+    }
+    box.innerHTML=html;
+    show(d);
+  }catch(e){
+    box.innerHTML=`<div class="badge err">${e.message.includes('not configured')?'Email not configured — save your IMAP settings first.':e.message}</div>`;
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+loadResumeSummary();
+loadStats();
+loadPipeline();
+loadEmailConfigStatus();
+</script>
+</body>
+</html>

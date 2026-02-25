@@ -1,0 +1,9 @@
+ats_score: 2
+company: MockCorp
+created_at: '2026-02-25T17:30:35.735561Z'
+highlights: temp_resumes/mockcorp_co-founder_&_software_engineer/resume_highlights.txt
+job_id: mockcorp_co-founder_&_software_engineer
+job_title: Co-Founder & Software Engineer
+pdf: temp_resumes/mockcorp_co-founder_&_software_engineer/resume_tailored.pdf
+status: confirmed
+tailored_yaml: temp_resumes/mockcorp_co-founder_&_software_engineer/resume_tailored.yaml

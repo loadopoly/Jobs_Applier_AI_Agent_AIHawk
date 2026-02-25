@@ -14,6 +14,14 @@ class Job:
     resume_path: str = ""
     cover_letter_path: str = ""
 
+    @property
+    def id(self):
+        return f"{self.company}_{self.role}".replace(" ", "_").lower()
+
+    @property
+    def title(self):
+        return self.role
+
     def formatted_job_information(self):
         """
         Formats the job information as a markdown string.

@@ -6,8 +6,8 @@ import shutil
 from dataclasses import asdict
 
 from config import JOB_APPLICATIONS_DIR
-from job import Job
-from job_application import JobApplication
+from src.job import Job
+from src.job_application import JobApplication
 
 # Base directory where all applications will be saved
 BASE_DIR = JOB_APPLICATIONS_DIR
@@ -44,7 +44,7 @@ class ApplicationSaver:
             self.job_application_files_path, "job_application.json"
         )
         with open(json_file_path, "w") as json_file:
-            json.dump(self.job_application.application, json_file, indent=4)
+            json.dump(asdict(self.job_application), json_file, indent=4)
 
     # Function to save files like Resume and CV
     def save_file(self, dir_path, file_path, new_filename):

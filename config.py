@@ -1,12 +1,13 @@
 # In this file, you can set the configurations of the app.
+# Version: 0.6.0
 
 from src.utils.constants import DEBUG, ERROR
 
 #config related to logging must have prefix LOG_
-LOG_LEVEL = 'ERROR'
+LOG_LEVEL = 'INFO'
 LOG_SELENIUM_LEVEL = ERROR
 LOG_TO_FILE = False
-LOG_TO_CONSOLE = False
+LOG_TO_CONSOLE = True
 
 MINIMUM_WAIT_TIME_IN_SECONDS = 60
 
