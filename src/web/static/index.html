@@ -167,6 +167,7 @@
       <label>Email Address</label><input id="emailAddr" type="email" placeholder="you@gmail.com"/>
       <label>App Password <span class="tag">(use app-specific password, not main login)</span></label>
       <input id="emailPass" type="password" placeholder="••••••••"/>
+      <p style="font-size:11px;margin-top:4px"><a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#2563eb">Click here to generate a Gmail App Password</a></p>
       <button id="saveEmailBtn" onclick="saveEmailConfig()">💾 Save &amp; Test Connection</button>
     </section>
 
@@ -197,8 +198,39 @@ let pendingResumeFile=null;
 let batchRunning=false;
 let batchStartedAt=0;
 let batchTimer=null;
+let logPollTimer=null;
 
 function show(d){output.textContent=JSON.stringify(d,null,2)}
+
+function updateLogs(logs){
+  if(!logs || !logs.length) return;
+  output.textContent = logs.join('\n');
+  output.scrollTop = output.scrollHeight;
+}
+
+async function pollBatchStatus(){
+  try {
+    const r = await fetch('/api/batch-status');
+    const d = await r.json();
+    if(d.logs) updateLogs(d.logs);
+    if(!d.running && batchRunning){
+      stopBatchUI();
+      await loadStats();
+      await loadPipeline();
+    }
+  } catch(e) { console.error("Poll error",e); }
+}
+
+function stopBatchUI(){
+  batchRunning=false;
+  const btn=document.getElementById('runBatchBtn');
+  const status=document.getElementById('batchRunStatus');
+  btn.disabled=false;
+  btn.textContent='▶ Start Batch';
+  status.style.display='none';
+  if(batchTimer){ clearInterval(batchTimer); batchTimer=null; }
+  if(logPollTimer){ clearInterval(logPollTimer); logPollTimer=null; }
+}
 
 async function api(path,body){
   const res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -279,24 +311,22 @@ async function runBatch(){
   const setRunning=(running)=>{
     batchRunning=running;
     btn.disabled=running;
-    btn.textContent=running?'⏳ Running Batch…':'▶ Start Batch';
+    btn.textContent=running?'⏳ Running…':'▶ Start Batch';
     status.style.display=running?'block':'none';
 
     if(running){
+      output.textContent = "Initializing batch...\n";
       batchStartedAt=Date.now();
       const tick=()=>{
-        const sec=Math.max(1,Math.floor((Date.now()-batchStartedAt)/1000));
-        status.innerHTML=`Batch running for <strong>${sec}s</strong>… check Output below for results when complete.`;
+        const sec=Math.max(0,Math.floor((Date.now()-batchStartedAt)/1000));
+        status.innerHTML=`Batch running for <strong>${sec}s</strong>… viewing live logs below.`;
       };
       tick();
       batchTimer=setInterval(tick,1000);
-    } else if(batchTimer){
-      clearInterval(batchTimer);
-      batchTimer=null;
+      logPollTimer=setInterval(pollBatchStatus,2000);
     }
   };
 
-  setRunning(true);
   try{
     const positions=document.getElementById('positions').value.split(',').map(v=>v.trim()).filter(Boolean);
     const locations=document.getElementById('locations').value.split(',').map(v=>v.trim()).filter(Boolean);
@@ -308,10 +338,14 @@ async function runBatch(){
       positions:positions.length?positions:undefined,
       locations:locations.length?locations:undefined,
     };
-    show(await api('/api/run-batch',payload));
-    await loadStats();await loadPipeline();
-  }catch(e){show({error:String(e)});}
-  finally{setRunning(false);}
+    
+    const res = await api('/api/run-batch',payload);
+    setRunning(true);
+    show(res);
+  }catch(e){
+    show({error:String(e)});
+    setRunning(false);
+  }
 }
 
 // ── ATS ───────────────────────────────────────────────────────────────────

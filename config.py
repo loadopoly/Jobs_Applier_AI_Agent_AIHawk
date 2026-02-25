@@ -1,5 +1,5 @@
 # In this file, you can set the configurations of the app.
-# Version: 0.6.0
+# Version: 0.7.0
 
 from src.utils.constants import DEBUG, ERROR
 
