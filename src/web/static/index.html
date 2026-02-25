@@ -113,7 +113,8 @@
       <input id="positions" placeholder="Loading from resume…"/>
       <label>Locations (comma separated)</label>
       <input id="locations" value="United States,Remote"/>
-      <button onclick="runBatch()">▶ Start Batch</button>
+      <button id="runBatchBtn" onclick="runBatch()">▶ Start Batch</button>
+      <div id="batchRunStatus" class="badge info" style="display:none">Batch running…</div>
     </section>
   </div>
 
@@ -166,7 +167,7 @@
       <label>Email Address</label><input id="emailAddr" type="email" placeholder="you@gmail.com"/>
       <label>App Password <span class="tag">(use app-specific password, not main login)</span></label>
       <input id="emailPass" type="password" placeholder="••••••••"/>
-      <button onclick="saveEmailConfig()">💾 Save &amp; Test Connection</button>
+      <button id="saveEmailBtn" onclick="saveEmailConfig()">💾 Save &amp; Test Connection</button>
     </section>
 
     <!-- Email Scan -->
@@ -193,6 +194,9 @@
 const output=document.getElementById('output');
 const statsOut=document.getElementById('statsOut');
 let pendingResumeFile=null;
+let batchRunning=false;
+let batchStartedAt=0;
+let batchTimer=null;
 
 function show(d){output.textContent=JSON.stringify(d,null,2)}
 
@@ -268,6 +272,31 @@ async function uploadResume(){
 
 // ── Batch ─────────────────────────────────────────────────────────────────
 async function runBatch(){
+  if(batchRunning)return;
+  const btn=document.getElementById('runBatchBtn');
+  const status=document.getElementById('batchRunStatus');
+
+  const setRunning=(running)=>{
+    batchRunning=running;
+    btn.disabled=running;
+    btn.textContent=running?'⏳ Running Batch…':'▶ Start Batch';
+    status.style.display=running?'block':'none';
+
+    if(running){
+      batchStartedAt=Date.now();
+      const tick=()=>{
+        const sec=Math.max(1,Math.floor((Date.now()-batchStartedAt)/1000));
+        status.innerHTML=`Batch running for <strong>${sec}s</strong>… check Output below for results when complete.`;
+      };
+      tick();
+      batchTimer=setInterval(tick,1000);
+    } else if(batchTimer){
+      clearInterval(batchTimer);
+      batchTimer=null;
+    }
+  };
+
+  setRunning(true);
   try{
     const positions=document.getElementById('positions').value.split(',').map(v=>v.trim()).filter(Boolean);
     const locations=document.getElementById('locations').value.split(',').map(v=>v.trim()).filter(Boolean);
@@ -282,6 +311,7 @@ async function runBatch(){
     show(await api('/api/run-batch',payload));
     await loadStats();await loadPipeline();
   }catch(e){show({error:String(e)});}
+  finally{setRunning(false);}
 }
 
 // ── ATS ───────────────────────────────────────────────────────────────────
@@ -358,6 +388,7 @@ async function loadEmailConfigStatus(){
 }
 
 async function saveEmailConfig(){
+  const btn=document.getElementById('saveEmailBtn');
   const cfg={
     imap_host:document.getElementById('imapHost').value,
     imap_port:Number(document.getElementById('imapPort').value||993),
@@ -365,10 +396,16 @@ async function saveEmailConfig(){
     password:document.getElementById('emailPass').value,
     use_ssl:document.getElementById('imapSsl').value==='true',
   };
+  btn.disabled=true;
+  btn.textContent='Testing Connection…';
   try{
     show(await api('/api/email/config',cfg));
     await loadEmailConfigStatus();
   }catch(e){show({error:String(e)});}
+  finally{
+    btn.disabled=false;
+    btn.textContent='💾 Save & Test Connection';
+  }
 }
 
 // ── Email Scan ────────────────────────────────────────────────────────────
