@@ -418,6 +418,12 @@ async function scanEmail(){
     const d=await r.json();
     if(!r.ok)throw new Error(JSON.stringify(d));
     let html=`<p style="font-size:12px;color:#6b7280;margin:0 0 8px">${d.scanned} message(s) scanned</p>`;
+    
+    if(d.auto_updated_count > 0){
+      html+=`<div class="badge ok" style="margin-bottom:12px">🔄 Auto-updated <strong>${d.auto_updated_count}</strong> job status(es) in Pipeline Tracker.</div>`;
+      await loadPipeline(); 
+    }
+
     if(d.rejections&&d.rejections.length){
       html+='<p style="margin:4px 0;font-weight:600;font-size:12px;color:#991b1b">⛔ Rejections ('+d.rejections.length+')</p>';
       d.rejections.forEach(e=>{
