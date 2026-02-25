@@ -51,7 +51,7 @@ class EmailConfigRequest(BaseModel):
     imap_host: str
     imap_port: int = 993
     email_address: str
-    password: str
+    password: str = ""
     folder: str = "INBOX"
     use_ssl: bool = True
 
@@ -109,6 +109,58 @@ def _load_runtime():
         logger.warning("No LLM API key found; ATS/briefing endpoints need one.")
 
     return config, secrets, llm_api_key
+
+
+def _load_secrets() -> Dict[str, Any]:
+    secrets_path = Path("data_folder/secrets.yaml")
+    if not secrets_path.exists():
+        return {}
+    try:
+        with open(secrets_path, "r", encoding="utf-8") as fh:
+            return yaml.safe_load(fh) or {}
+    except Exception:
+        return {}
+
+
+def _save_secrets(secrets: Dict[str, Any]) -> None:
+    secrets_path = Path("data_folder/secrets.yaml")
+    secrets_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(secrets_path, "w", encoding="utf-8") as fh:
+        yaml.safe_dump(secrets, fh, sort_keys=False)
+
+
+def _resolve_email_config(cfg: Dict[str, Any], persist_password: bool = False) -> Dict[str, Any]:
+    resolved = dict(cfg)
+
+    email_address = (resolved.get("email_address") or "").strip()
+    imap_host = (resolved.get("imap_host") or "").strip()
+    password = (resolved.get("password") or "").strip()
+
+    # Gmail defaults and common app-password formatting (spaces are often copied in)
+    if email_address.lower().endswith(("@gmail.com", "@googlemail.com")):
+        if not imap_host:
+            imap_host = "imap.gmail.com"
+        if not resolved.get("imap_port"):
+            resolved["imap_port"] = 993
+        resolved["use_ssl"] = True
+        password = password.replace(" ", "")
+
+    resolved["email_address"] = email_address
+    resolved["imap_host"] = imap_host
+
+    # When password is omitted/masked, recover from secrets.yaml
+    if not password or password == "***":
+        secrets = _load_secrets()
+        password = (secrets.get("email_password") or "").strip()
+
+    resolved["password"] = password
+
+    if persist_password and password:
+        secrets = _load_secrets()
+        secrets["email_password"] = password
+        _save_secrets(secrets)
+
+    return resolved
 
 
 # ---------------------------------------------------------------------------
@@ -323,18 +375,41 @@ def get_email_config():
     cfg = load_email_config()
     if not cfg:
         return {"configured": False}
-    return {"configured": True, "imap_host": cfg.get("imap_host"), "email_address": cfg.get("email_address")}
+    resolved = _resolve_email_config(cfg)
+    return {
+        "configured": True,
+        "imap_host": resolved.get("imap_host"),
+        "imap_port": resolved.get("imap_port", 993),
+        "use_ssl": bool(resolved.get("use_ssl", True)),
+        "email_address": resolved.get("email_address"),
+    }
 
 
 @app.post("/api/email/config")
 def set_email_config(payload: EmailConfigRequest):
-    cfg = payload.model_dump()
+    cfg = _resolve_email_config(payload.model_dump(), persist_password=True)
+    if not cfg.get("password"):
+        raise HTTPException(
+            status_code=400,
+            detail="Missing email app password. For Gmail, generate a 16-character App Password.",
+        )
+
     # Test connection before saving
     monitor = EmailMonitor.from_config(cfg)
     if not monitor.test_connection():
-        raise HTTPException(status_code=400, detail="Could not connect to IMAP server. Check credentials.")
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Could not connect to IMAP server. For Gmail use imap.gmail.com:993 with SSL and a 16-character App Password."
+            ),
+        )
+
     save_email_config(cfg)
-    return {"status": "saved", "imap_host": cfg["imap_host"]}
+    return {
+        "status": "saved",
+        "imap_host": cfg["imap_host"],
+        "email_address": cfg["email_address"],
+    }
 
 
 @app.get("/api/email/scan")
@@ -342,12 +417,12 @@ def scan_email(hours: int = 48):
     cfg = load_email_config()
     if not cfg:
         raise HTTPException(status_code=400, detail="Email not configured. POST /api/email/config first.")
-    # Re-load password from secrets (save_email_config masks it)
-    secrets_path = Path("data_folder/secrets.yaml")
-    if secrets_path.exists():
-        with open(secrets_path, "r", encoding="utf-8") as fh:
-            secrets = yaml.safe_load(fh) or {}
-        cfg["password"] = secrets.get("email_password", cfg.get("password", ""))
+    cfg = _resolve_email_config(cfg)
+    if not cfg.get("password"):
+        raise HTTPException(
+            status_code=400,
+            detail="Email password is not set. Save your IMAP config with an app password first.",
+        )
 
     monitor = EmailMonitor.from_config(cfg)
     events = monitor.scan_since(hours=hours)
