@@ -74,7 +74,8 @@ class BotManager:
                     break
                 
                 logger.info(f"Searching for '{position}' in '{location}'")
-                jobs = bot.search_jobs(position, location)
+                remaining = count - applied_count
+                jobs = bot.search_jobs(position, location, count=remaining)
                 
                 for job in jobs:
                     if applied_count >= count:
