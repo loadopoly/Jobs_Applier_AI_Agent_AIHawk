@@ -25,6 +25,8 @@ from src.libs.resume_parser import extract_summary, extract_positions
 from src.libs.resume_tailor import (
     ResumeTailor, list_tailored_resumes, load_tailored_resume,
 )
+from src.libs.profile_manager import ProfileManager, Profile
+from src.libs.email_oauth2 import OAUTH_PROVIDERS
 from src.logging import logger
 
 # ---------------------------------------------------------------------------
@@ -71,6 +73,16 @@ class EmailConfigRequest(BaseModel):
     password: str = ""
     folder: str = "INBOX"
     use_ssl: bool = True
+
+
+class ProfileCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=50)
+    description: str = ""
+    save_current: bool = False  # If true, save current config to profile
+
+
+class ProfileSwitchRequest(BaseModel):
+    name: str = Field(min_length=1)
 
 
 # ---------------------------------------------------------------------------
@@ -194,6 +206,40 @@ def health():
     return {"status": "ok", "version": "0.7.0"}
 
 
+@app.get("/api/secrets")
+def get_secrets():
+    """Return secrets (with keys masked for security)."""
+    secrets = _load_secrets()
+    # Mask all values for security, but show if they exist
+    masked = {}
+    for key in ["gemini_api_key", "openai_api_key", "claude_api_key", 
+                "huggingface_api_key", "perplexity_api_key", "llm_api_key",
+                "linkedin_email", "linkedin_password"]:
+        value = secrets.get(key, "")
+        masked[key] = value if value and value.strip() else ""
+    return masked
+
+
+@app.post("/api/secrets")
+def update_secrets(payload: Dict[str, str]):
+    """Update API keys and credentials in secrets.yaml."""
+    secrets = _load_secrets()
+    
+    # Update only the provided keys that have non-empty values
+    allowed_keys = ["gemini_api_key", "openai_api_key", "claude_api_key",
+                    "huggingface_api_key", "perplexity_api_key", "llm_api_key",
+                    "linkedin_email", "linkedin_password"]
+    
+    for key in allowed_keys:
+        if key in payload:
+            value = payload[key].strip()
+            if value:  # Only save non-empty keys
+                secrets[key] = value
+    
+    _save_secrets(secrets)
+    return {"status": "saved", "message": "Credentials updated successfully"}
+
+
 @app.get("/api/stats")
 def stats():
     summary = ApplicationStatsService(Path("job_applications")).summarize()
@@ -312,6 +358,27 @@ def run_batch(payload: RunBatchRequest):
     return {"status": "started", "message": "Batch process started in background."}
 
 
+@app.post("/api/batch/stop")
+def stop_batch():
+    """Stop the currently running batch."""
+    global batch_active
+    if not batch_active:
+        return {"status": "not_running", "message": "No batch is currently running."}
+    
+    batch_active = False
+    logger.info("Batch stop requested by user")
+    return {"status": "stopping", "message": "Batch will stop after current job."}
+
+
+@app.post("/api/batch/reset")
+def reset_batch():
+    """Reset batch state (use if batch is stuck)."""
+    global batch_active, batch_logs
+    batch_active = False
+    batch_logs = []
+    return {"status": "reset", "message": "Batch state has been reset."}
+
+
 @app.get("/api/batch-status")
 def get_batch_status():
     global batch_active, batch_logs
@@ -383,6 +450,72 @@ def download_highlights(job_id: str):
         media_type="text/plain",
         filename=f"interview_highlights_{job_id}.txt",
     )
+
+
+# ---------------------------------------------------------------------------
+# Profile Management
+# ---------------------------------------------------------------------------
+
+@app.get("/api/profiles")
+def list_profiles():
+    """List all available profiles."""
+    profiles = ProfileManager.list_profiles()
+    active = ProfileManager.get_active_profile()
+    return {
+        "profiles": [p.to_dict() for p in profiles],
+        "active_profile": active
+    }
+
+
+@app.post("/api/profiles")
+def create_profile(payload: ProfileCreateRequest):
+    """Create a new profile or save current config to a profile."""
+    try:
+        if payload.save_current:
+            # Save current data_folder to profile
+            profile = ProfileManager.save_current_to_profile(payload.name, payload.description)
+        else:
+            # Create empty profile
+            profile = ProfileManager.create_profile(payload.name, payload.description)
+        
+        return {
+            "status": "created",
+            "profile": profile.to_dict()
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/profiles/switch")
+def switch_profile(payload: ProfileSwitchRequest):
+    """Switch to a different profile."""
+    try:
+        ProfileManager.set_active_profile(payload.name)
+        profile = Profile(payload.name)
+        return {
+            "status": "switched",
+            "profile": profile.to_dict()
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/profiles/{profile_name}")
+def delete_profile(profile_name: str):
+    """Delete a profile."""
+    profile = Profile(profile_name)
+    if not profile.exists():
+        raise HTTPException(status_code=404, detail=f"Profile '{profile_name}' not found")
+    
+    active = ProfileManager.get_active_profile()
+    if active == profile_name:
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot delete active profile. Switch to another profile first."
+        )
+    
+    profile.delete()
+    return {"status": "deleted", "profile_name": profile_name}
 
 
 # ---------------------------------------------------------------------------
@@ -517,3 +650,120 @@ def scan_email(hours: int = 48):
         "auto_updated_count": len(auto_updated),
         "auto_updated_jobs": auto_updated
     }
+
+
+# ---------------------------------------------------------------------------
+# OAuth2 Email Authentication
+# ---------------------------------------------------------------------------
+
+@app.get("/api/email/oauth2/providers")
+def get_oauth2_providers():
+    """List available OAuth2 providers."""
+    from src.libs.email_oauth2 import OAUTH_PROVIDERS
+    return {
+        "providers": [
+            {"id": key, "name": config["name"]}
+            for key, config in OAUTH_PROVIDERS.items()
+        ]
+    }
+
+
+@app.post("/api/email/oauth2/start")
+def start_oauth2_flow(payload: Dict[str, str]):
+    """Start OAuth2 authentication flow."""
+    from src.libs.email_oauth2 import EmailOAuth2
+    
+    provider = payload.get("provider", "gmail")
+    email_address = payload.get("email_address", "")
+    
+    if not email_address:
+        raise HTTPException(status_code=400, detail="Email address required")
+    
+    try:
+        oauth2 = EmailOAuth2(provider)
+        auth_url = oauth2.start_auth_flow()
+        
+        # Store email address temporarily for callback
+        temp_path = Path("data_folder/.oauth2_temp.yaml")
+        temp_path.write_text(yaml.safe_dump({
+            "email_address": email_address,
+            "provider": provider
+        }))
+        
+        return {
+            "status": "started",
+            "auth_url": auth_url,
+            "message": "Browser opened for authentication. Waiting for callback..."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/email/oauth2/complete")
+def complete_oauth2_flow():
+    """Complete OAuth2 flow after user authenticates."""
+    from src.libs.email_oauth2 import EmailOAuth2, save_oauth2_tokens
+    
+    temp_path = Path("data_folder/.oauth2_temp.yaml")
+    if not temp_path.exists():
+        raise HTTPException(status_code=400, detail="No OAuth2 flow in progress")
+    
+    try:
+        with open(temp_path, "r") as fh:
+            temp_data = yaml.safe_load(fh) or {}
+        
+        provider = temp_data.get("provider", "gmail")
+        email_address = temp_data.get("email_address", "")
+        
+        oauth2 = EmailOAuth2(provider)
+        
+        # Wait for callback (this blocks but in real app would be async)
+        auth_code = oauth2.wait_for_callback(timeout=300)
+        
+        if not auth_code:
+            raise HTTPException(status_code=400, detail="Authentication failed or timed out")
+        
+        # Exchange code for tokens
+        tokens = oauth2.exchange_code_for_tokens(auth_code, email_address)
+        
+        # Save tokens
+        save_oauth2_tokens(tokens)
+        
+        # Clean up temp file
+        temp_path.unlink()
+        
+        # Save email config
+        email_cfg = {
+            "imap_host": OAUTH_PROVIDERS[provider]["imap_host"],
+            "imap_port": OAUTH_PROVIDERS[provider]["imap_port"],
+            "email_address": email_address,
+            "use_ssl": True,
+            "folder": "INBOX",
+            "auth_method": "oauth2"
+        }
+        save_email_config(email_cfg)
+        
+        return {
+            "status": "success",
+            "email_address": email_address,
+            "provider": provider,
+            "message": "Email configured with OAuth2 (MFA supported)"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/email/oauth2/status")
+def get_oauth2_status():
+    """Check if OAuth2 tokens are configured."""
+    from src.libs.email_oauth2 import load_oauth2_tokens
+    
+    tokens = load_oauth2_tokens()
+    if tokens:
+        return {
+            "configured": True,
+            "email_address": tokens.email_address,
+            "provider": tokens.provider,
+            "expired": tokens.is_expired()
+        }
+    return {"configured": False}

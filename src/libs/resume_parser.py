@@ -41,10 +41,24 @@ def load_resume(resume_path: Path) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def _extract_positions_from_text(text: str) -> List[str]:
-    """Heuristic: return lines that look like job titles."""
+    """
+    Heuristic: extract actual job titles from resume text.
+    Strategy: Look for lines that follow typical resume patterns:
+    - After company names or date ranges
+    - Capitalized titles (not sentences)
+    - Contain job title keywords but aren't bullet points
+    """
     positions: List[str] = []
     seen: set = set()
-    for line in text.splitlines():
+    lines = text.splitlines()
+    
+    # Pattern to detect bullet points (lines starting with •, ▪, -, *, numbers, etc.)
+    bullet_pattern = re.compile(r'^\s*[•▪\-\*\d]+[\.\)]*\s+')
+    
+    # Pattern to detect date ranges (e.g., "Aug 2019 - May 2021", "2019-2021")
+    date_pattern = re.compile(r'\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{4})\b.*\b(present|\d{4})\b', re.I)
+    
+    for i, line in enumerate(lines):
         line = line.strip()
         if 4 <= len(line) <= 80:
             lower = line.lower()
