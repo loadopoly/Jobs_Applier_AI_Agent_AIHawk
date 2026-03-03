@@ -61,8 +61,47 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>AIHawk Control Panel v0.6.0</h1>
+  <h1>AIHawk Control Panel v0.7.0</h1>
   <p class="subtitle">Resume-driven automation — ATS scored & tailored before every application.</p>
+
+  <!-- Profile Management Section -->
+  <section class="card row-full">
+    <h2>👤 User Profile <span class="tag" id="activeProfileName">No profile selected</span>
+      <button onclick="loadProfiles()" class="sm secondary" style="margin-left:10px">↻ Refresh</button>
+    </h2>
+    <div class="badge info" style="margin-top:0;font-size:11px">
+      Profiles bundle your API key, LinkedIn credentials, resume, and email config together. 
+      Create or switch profiles to manage multiple accounts or backup your configuration.
+    </div>
+    <div class="row2" style="margin-top:10px">
+      <div>
+        <label>Select Profile</label>
+        <select id="profileSelect" onchange="showProfileDetails()">
+          <option value="">Loading profiles...</option>
+        </select>
+      </div>
+      <div>
+        <label>New Profile Name</label>
+        <input id="newProfileName" placeholder="e.g., adam_work"/>
+      </div>
+    </div>
+    <div class="row2">
+      <div>
+        <label>Description (optional)</label>
+        <input id="newProfileDesc" placeholder="e.g., Main job hunting profile"/>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:8px">
+        <button onclick="createProfile(false)" class="ok" style="margin-bottom:0;width:50%">➕ Create Empty</button>
+        <button onclick="createProfile(true)" class="ok" style="margin-bottom:0;width:50%">💾 Save Current</button>
+      </div>
+    </div>
+    <div id="profileDetails" style="margin-top:12px"></div>
+    <div class="row2" style="margin-top:8px;gap:8px">
+      <button onclick="switchProfile()" id="switchProfileBtn" style="display:none">🔄 Switch to Profile</button>
+      <button onclick="deleteProfile()" id="deleteProfileBtn" class="danger" style="display:none">🗑 Delete Profile</button>
+    </div>
+    <div id="profileMsg"></div>
+  </section>
 
   <!-- ROW 1: Resume + Batch -->
   <div class="row2b">
@@ -113,8 +152,45 @@
       <input id="positions" placeholder="Loading from resume…"/>
       <label>Locations (comma separated)</label>
       <input id="locations" value="United States,Remote"/>
-      <button id="runBatchBtn" onclick="runBatch()">▶ Start Batch</button>
+      <div class="row2" style="margin-top:8px;gap:8px">
+        <button id="runBatchBtn" onclick="runBatch()">▶ Start Batch</button>
+        <button onclick="stopBatch()" class="danger" style="width:48%">⏹ Stop Batch</button>
+      </div>
+      <button onclick="resetBatch()" class="secondary" style="margin-top:4px">🔄 Reset (if stuck)</button>
       <div id="batchRunStatus" class="badge info" style="display:none">Batch running…</div>
+    </section>
+  </div>
+
+  <!-- ROW 1.5: Credentials Configuration -->
+  <div class="row2" style="margin-bottom:16px">
+    <!-- API Key Configuration -->
+    <section class="card">
+      <h2>🔑 LLM API Key</h2>
+      <div class="badge info" style="margin-top:0;font-size:11px">Required for ATS scoring and resume generation.</div>
+      <label>API Provider</label>
+      <select id="apiProvider">
+        <option value="gemini_api_key">Gemini (default)</option>
+        <option value="openai_api_key">OpenAI</option>
+        <option value="claude_api_key">Claude</option>
+        <option value="huggingface_api_key">HuggingFace</option>
+        <option value="perplexity_api_key">Perplexity</option>
+      </select>
+      <label>API Key <span class="tag" id="apiKeyStatus">Not configured</span></label>
+      <input id="apiKey" type="password" placeholder="Paste your API key here"/>
+      <button onclick="saveApiKey()">💾 Save API Key</button>
+      <div id="apiKeyMsg"></div>
+    </section>
+
+    <!-- LinkedIn Credentials -->
+    <section class="card">
+      <h2>💼 LinkedIn Credentials</h2>
+      <div class="badge info" style="margin-top:0;font-size:11px">Required for applying to jobs on LinkedIn.</div>
+      <label>LinkedIn Email <span class="tag" id="linkedinStatus">Not configured</span></label>
+      <input id="linkedinEmail" type="email" placeholder="your.email@example.com"/>
+      <label>LinkedIn Password</label>
+      <input id="linkedinPassword" type="password" placeholder="Your LinkedIn password"/>
+      <button onclick="saveLinkedIn()">💾 Save LinkedIn Credentials</button>
+      <div id="linkedinMsg"></div>
     </section>
   </div>
 
@@ -155,20 +231,53 @@
     <!-- Email Config -->
     <section class="card">
       <h2>📧 Email Inbox Setup</h2>
-      <div class="badge info" style="margin-top:0;font-size:11px">Connect your email so rejection &amp; pipeline updates are auto-detected.</div>
+      <div class="badge info" style="margin-top:0;font-size:11px">Connect your email so rejection & pipeline updates are auto-detected. OAuth2 supports MFA!</div>
       <div id="emailConfigStatus"></div>
-      <label>IMAP Host</label><input id="imapHost" placeholder="imap.gmail.com"/>
-      <div class="row2">
-        <div><label>Port</label><input id="imapPort" type="number" value="993"/></div>
-        <div><label>SSL</label>
-          <select id="imapSsl" style="margin-top:4px"><option value="true">Yes (recommended)</option><option value="false">No</option></select>
+      
+      <!-- OAuth2 Method (Recommended) -->
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-top:10px">
+        <strong style="color:#166534">✓ Recommended: OAuth2 (MFA Supported)</strong>
+        <p style="margin:8px 0 4px;font-size:12px;color:#166534">Most secure - works with 2FA/MFA enabled accounts</p>
+        <div class="badge info" style="margin:8px 0;font-size:11px;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe">
+          ⚠️ <strong>Setup Required:</strong> OAuth2 needs client credentials from Google/Microsoft.
+          See <code style="background:#dbeafe;padding:2px 4px;border-radius:3px">OAUTH2_EMAIL_SETUP.md</code> for setup instructions.
+          Or use manual IMAP below (works immediately with app passwords).
         </div>
+        <div class="row2" style="margin-top:8px">
+          <div>
+            <label>Email Provider</label>
+            <select id="emailProvider">
+              <option value="gmail">Gmail</option>
+              <option value="outlook">Outlook</option>
+            </select>
+          </div>
+          <div>
+            <label>Email Address</label>
+            <input id="oauth2Email" type="email" placeholder="you@gmail.com"/>
+          </div>
+        </div>
+        <button onclick="connectWithOAuth2()" class="ok">🔐 Connect with OAuth2</button>
+        <div id="oauth2Msg"></div>
       </div>
-      <label>Email Address</label><input id="emailAddr" type="email" placeholder="you@gmail.com"/>
-      <label>App Password <span class="tag">(use app-specific password, not main login)</span></label>
-      <input id="emailPass" type="password" placeholder="••••••••"/>
-      <p style="font-size:11px;margin-top:4px"><a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#2563eb">Click here to generate a Gmail App Password</a></p>
-      <button id="saveEmailBtn" onclick="saveEmailConfig()">💾 Save &amp; Test Connection</button>
+      
+      <!-- Manual IMAP Method (Fallback) -->
+      <details style="margin-top:12px">
+        <summary style="cursor:pointer;font-size:13px;color:#6b7280;padding:8px">Or use manual IMAP setup (app password required)</summary>
+        <div style="padding:8px">
+          <label>IMAP Host</label><input id="imapHost" placeholder="imap.gmail.com"/>
+          <div class="row2">
+            <div><label>Port</label><input id="imapPort" type="number" value="993"/></div>
+            <div><label>SSL</label>
+              <select id="imapSsl" style="margin-top:4px"><option value="true">Yes (recommended)</option><option value="false">No</option></select>
+            </div>
+          </div>
+          <label>Email Address</label><input id="emailAddr" type="email" placeholder="you@gmail.com"/>
+          <label>App Password <span class="tag">(use app-specific password, not main login)</span></label>
+          <input id="emailPass" type="password" placeholder="••••••••"/>
+          <p style="font-size:11px;margin-top:4px"><a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#2563eb">Click here to generate a Gmail App Password</a></p>
+          <button id="saveEmailBtn" onclick="saveEmailConfig()">💾 Save & Test Connection</button>
+        </div>
+      </details>
     </section>
 
     <!-- Email Scan -->
@@ -343,8 +452,40 @@ async function runBatch(){
     setRunning(true);
     show(res);
   }catch(e){
-    show({error:String(e)});
+    const errMsg=String(e);
+    show({error:errMsg});
+    if(errMsg.includes('already running')){
+      status.innerHTML='<div class="badge err">Batch already running. Use Stop or Reset buttons.</div>';
+      status.style.display='block';
+    }
     setRunning(false);
+  }
+}
+
+async function stopBatch(){
+  try{
+    const r=await fetch('/api/batch/stop',{method:'POST'});
+    const d=await r.json();
+    show({message:'Stop requested',response:d});
+    output.textContent='Batch stop requested. Will stop after current job.\n';
+  }catch(e){
+    show({error:'Failed to stop batch: '+String(e)});
+  }
+}
+
+async function resetBatch(){
+  if(!confirm('Reset batch state? This will clear any stuck batch processes.')){
+    return;
+  }
+  try{
+    const r=await fetch('/api/batch/reset',{method:'POST'});
+    const d=await r.json();
+    show({message:'Batch reset',response:d});
+    output.textContent='Batch state reset successfully.\n';
+    stopBatchUI();
+    await loadStats();
+  }catch(e){
+    show({error:'Failed to reset batch: '+String(e)});
   }
 }
 
@@ -442,6 +583,57 @@ async function saveEmailConfig(){
   }
 }
 
+// ── Email OAuth2 ──────────────────────────────────────────────────────────
+async function connectWithOAuth2(){
+  const provider=document.getElementById('emailProvider').value;
+  const email=document.getElementById('oauth2Email').value.trim();
+  const msg=document.getElementById('oauth2Msg');
+  
+  if(!email){
+    msg.innerHTML='<div class="badge err" style="margin-top:8px">Please enter your email address</div>';
+    return;
+  }
+  
+  msg.innerHTML='<div class="badge info" style="margin-top:8px">Opening browser for authentication...</div>';
+  
+  try{
+    // Start OAuth2 flow
+    const r1=await fetch('/api/email/oauth2/start',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({provider,email_address:email})
+    });
+    const d1=await r1.json();
+    if(!r1.ok){
+      const errMsg=d1.detail||d1.message||'Failed to start OAuth2';
+      if(errMsg.includes('CLIENT_ID')||errMsg.includes('credentials')){
+        throw new Error('OAuth2 credentials not configured. See OAUTH2_EMAIL_SETUP.md for setup instructions.');
+      }
+      throw new Error(errMsg);
+    }
+    
+    msg.innerHTML='<div class="badge info" style="margin-top:8px">✓ Browser opened! Authenticate in browser.<br>Waiting for callback...</div>';
+    
+    // Wait and complete
+    setTimeout(async ()=>{
+      try{
+        const r2=await fetch('/api/email/oauth2/complete',{method:'POST'});
+        const d2=await r2.json();
+        if(!r2.ok)throw new Error(d2.detail||'Authentication failed');
+        
+        msg.innerHTML=`<div class="badge ok" style="margin-top:8px">✓ Email connected with OAuth2! MFA supported.</div>`;
+        await loadEmailConfigStatus();
+        setTimeout(()=>msg.innerHTML='',5000);
+      }catch(e){
+        msg.innerHTML=`<div class="badge err" style="margin-top:8px">${e.message}<br><small>Tip: Use manual IMAP setup below instead.</small></div>`;
+      }
+    },3000);
+    
+  }catch(e){
+    msg.innerHTML=`<div class="badge err" style="margin-top:8px">${e.message}<br><small>Use manual IMAP setup below for immediate setup.</small></div>`;
+  }
+}
+
 // ── Email Scan ────────────────────────────────────────────────────────────
 async function scanEmail(){
   const box=document.getElementById('emailResults');
@@ -484,11 +676,282 @@ async function scanEmail(){
   }
 }
 
+// ── API Key Management ────────────────────────────────────────────────────
+async function loadApiKeyStatus(){
+  try{
+    const r=await fetch('/api/secrets');
+    const d=await r.json();
+    const status=document.getElementById('apiKeyStatus');
+    const keyInput=document.getElementById('apiKey');
+    const provider=document.getElementById('apiProvider');
+    
+    let hasKey=false;
+    const providers=['gemini_api_key','openai_api_key','claude_api_key','huggingface_api_key','perplexity_api_key'];
+    for(const p of providers){
+      if(d[p] && d[p].trim()){
+        hasKey=true;
+        provider.value=p;
+        keyInput.placeholder='API key configured (hidden)';
+        break;
+      }
+    }
+    
+    if(hasKey){
+      status.textContent='✓ Configured';
+      status.style.color='#16a34a';
+    }else{
+      status.textContent='⚠ Not configured';
+      status.style.color='#dc2626';
+    }
+    
+    // LinkedIn status
+    const linkedinStatus=document.getElementById('linkedinStatus');
+    const linkedinEmail=document.getElementById('linkedinEmail');
+    if(d.linkedin_email && d.linkedin_email.trim()){
+      linkedinStatus.textContent='✓ Configured';
+      linkedinStatus.style.color='#16a34a';
+      linkedinEmail.placeholder=d.linkedin_email;
+    }else{
+      linkedinStatus.textContent='⚠ Not configured';
+      linkedinStatus.style.color='#dc2626';
+    }
+  }catch(e){
+    console.error('Failed to load credentials status',e);
+  }
+}
+
+async function saveApiKey(){
+  const provider=document.getElementById('apiProvider').value;
+  const key=document.getElementById('apiKey').value.trim();
+  const msg=document.getElementById('apiKeyMsg');
+  
+  if(!key){
+    msg.innerHTML='<div class="badge err" style="margin-top:8px">Please enter an API key</div>';
+    return;
+  }
+  
+  msg.innerHTML='<div class="badge info" style="margin-top:8px">Saving...</div>';
+  
+  try{
+    const r=await fetch('/api/secrets',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({[provider]:key})
+    });
+    const d=await r.json();
+    if(!r.ok)throw new Error(JSON.stringify(d));
+    
+    msg.innerHTML='<div class="badge ok" style="margin-top:8px">✓ API key saved successfully</div>';
+    document.getElementById('apiKey').value='';
+    document.getElementById('apiKey').placeholder='API key configured (hidden)';
+    await loadApiKeyStatus();
+    setTimeout(()=>msg.innerHTML='',3000);
+  }catch(e){
+    msg.innerHTML=`<div class="badge err" style="margin-top:8px">Failed to save: ${e.message}</div>`;
+  }
+}
+
+async function saveLinkedIn(){
+  const email=document.getElementById('linkedinEmail').value.trim();
+  const password=document.getElementById('linkedinPassword').value.trim();
+  const msg=document.getElementById('linkedinMsg');
+  
+  if(!email || !password){
+    msg.innerHTML='<div class="badge err" style="margin-top:8px">Please enter both email and password</div>';
+    return;
+  }
+  
+  msg.innerHTML='<div class="badge info" style="margin-top:8px">Saving...</div>';
+  
+  try{
+    const r=await fetch('/api/secrets',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({linkedin_email:email,linkedin_password:password})
+    });
+    const d=await r.json();
+    if(!r.ok)throw new Error(JSON.stringify(d));
+    
+    msg.innerHTML='<div class="badge ok" style="margin-top:8px">✓ LinkedIn credentials saved successfully</div>';
+    document.getElementById('linkedinEmail').value='';
+    document.getElementById('linkedinPassword').value='';
+    await loadApiKeyStatus();
+    setTimeout(()=>msg.innerHTML='',3000);
+  }catch(e){
+    msg.innerHTML=`<div class="badge err" style="margin-top:8px">Failed to save: ${e.message}</div>`;
+  }
+}
+
+// ── Profile Management ────────────────────────────────────────────────────
+let currentProfiles=[];
+
+async function loadProfiles(){
+  try{
+    const r=await fetch('/api/profiles');
+    const d=await r.json();
+    currentProfiles=d.profiles||[];
+    const active=d.active_profile;
+    
+    const select=document.getElementById('profileSelect');
+    const activeName=document.getElementById('activeProfileName');
+    
+    select.innerHTML='<option value="">-- Select a profile --</option>';
+    currentProfiles.forEach(p=>{
+      const opt=document.createElement('option');
+      opt.value=p.name;
+      opt.textContent=`${p.name}${p.name===active?' (active)':''}`;
+      if(p.name===active)opt.selected=true;
+      select.appendChild(opt);
+    });
+    
+    if(active){
+      activeName.textContent=`Active: ${active}`;
+      activeName.style.color='#16a34a';
+    }else{
+      activeName.textContent='No profile selected';
+      activeName.style.color='#6b7280';
+    }
+    
+    showProfileDetails();
+  }catch(e){
+    console.error('Failed to load profiles',e);
+  }
+}
+
+function showProfileDetails(){
+  const select=document.getElementById('profileSelect');
+  const name=select.value;
+  const details=document.getElementById('profileDetails');
+  const switchBtn=document.getElementById('switchProfileBtn');
+  const deleteBtn=document.getElementById('deleteProfileBtn');
+  
+  if(!name){
+    details.innerHTML='';
+    switchBtn.style.display='none';
+    deleteBtn.style.display='none';
+    return;
+  }
+  
+  const profile=currentProfiles.find(p=>p.name===name);
+  if(!profile){
+    details.innerHTML='';
+    switchBtn.style.display='none';
+    deleteBtn.style.display='none';
+    return;
+  }
+  
+  let html='<div style="background:#f9fafb;padding:10px;border-radius:8px;font-size:12px">';
+  html+=`<strong>${profile.name}</strong>`;
+  if(profile.description)html+=`<br><span style="color:#6b7280">${profile.description}</span>`;
+  html+=`<br><br>`;
+  html+=`<span class="chip ${profile.has_api_key?'ok':'warn'}">${profile.has_api_key?'✓':'✗'} API Key</span> `;
+  html+=`<span class="chip ${profile.has_linkedin?'ok':'warn'}">${profile.has_linkedin?'✓':'✗'} LinkedIn</span> `;
+  html+=`<span class="chip ${profile.has_resume?'ok':'warn'}">${profile.has_resume?'✓':'✗'} Resume</span> `;
+  html+=`<span class="chip ${profile.has_email?'ok':'warn'}">${profile.has_email?'✓':'✗'} Email</span>`;
+  html+=`</div>`;
+  details.innerHTML=html;
+  
+  switchBtn.style.display='block';
+  deleteBtn.style.display='block';
+}
+
+async function createProfile(saveCurrent){
+  const name=document.getElementById('newProfileName').value.trim();
+  const desc=document.getElementById('newProfileDesc').value.trim();
+  const msg=document.getElementById('profileMsg');
+  
+  if(!name){
+    msg.innerHTML='<div class="badge err" style="margin-top:8px">Please enter a profile name</div>';
+    return;
+  }
+  
+  msg.innerHTML='<div class="badge info" style="margin-top:8px">Creating profile...</div>';
+  
+  try{
+    const r=await fetch('/api/profiles',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name,description:desc,save_current:saveCurrent})
+    });
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail||JSON.stringify(d));
+    
+    msg.innerHTML=`<div class="badge ok" style="margin-top:8px">✓ Profile "${name}" created successfully</div>`;
+    document.getElementById('newProfileName').value='';
+    document.getElementById('newProfileDesc').value='';
+    await loadProfiles();
+    setTimeout(()=>msg.innerHTML='',3000);
+  }catch(e){
+    msg.innerHTML=`<div class="badge err" style="margin-top:8px">Failed: ${e.message}</div>`;
+  }
+}
+
+async function switchProfile(){
+  const name=document.getElementById('profileSelect').value;
+  const msg=document.getElementById('profileMsg');
+  
+  if(!name){
+    msg.innerHTML='<div class="badge err" style="margin-top:8px">Please select a profile</div>';
+    return;
+  }
+  
+  msg.innerHTML='<div class="badge info" style="margin-top:8px">Switching profile...</div>';
+  
+  try{
+    const r=await fetch('/api/profiles/switch',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name})
+    });
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail||JSON.stringify(d));
+    
+    msg.innerHTML=`<div class="badge ok" style="margin-top:8px">✓ Switched to profile "${name}"</div>`;
+    await loadProfiles();
+    await loadResumeSummary();
+    await loadApiKeyStatus();
+    await loadEmailConfigStatus();
+    setTimeout(()=>msg.innerHTML='',3000);
+  }catch(e){
+    msg.innerHTML=`<div class="badge err" style="margin-top:8px">Failed: ${e.message}</div>`;
+  }
+}
+
+async function deleteProfile(){
+  const name=document.getElementById('profileSelect').value;
+  const msg=document.getElementById('profileMsg');
+  
+  if(!name){
+    msg.innerHTML='<div class="badge err" style="margin-top:8px">Please select a profile</div>';
+    return;
+  }
+  
+  if(!confirm(`Are you sure you want to delete profile "${name}"? This cannot be undone.`)){
+    return;
+  }
+  
+  msg.innerHTML='<div class="badge info" style="margin-top:8px">Deleting profile...</div>';
+  
+  try{
+    const r=await fetch(`/api/profiles/${encodeURIComponent(name)}`,{method:'DELETE'});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail||JSON.stringify(d));
+    
+    msg.innerHTML=`<div class="badge ok" style="margin-top:8px">✓ Profile "${name}" deleted</div>`;
+    await loadProfiles();
+    setTimeout(()=>msg.innerHTML='',3000);
+  }catch(e){
+    msg.innerHTML=`<div class="badge err" style="margin-top:8px">Failed: ${e.message}</div>`;
+  }
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────
+loadProfiles();
 loadResumeSummary();
 loadStats();
 loadPipeline();
 loadEmailConfigStatus();
+loadApiKeyStatus();
 </script>
 </body>
 </html>

@@ -1,0 +1,57 @@
+remote: true
+hybrid: true
+onsite: true
+
+experience_level:
+  internship: false
+  entry: true
+  associate: true
+  mid_senior_level: true
+  director: false
+  executive: false
+
+job_types:
+  full_time: true
+  contract: false
+  part_time: false
+  temporary: true
+  internship: false
+  other: false
+  volunteer: true
+
+date:
+  all_time: false
+  month: false
+  week: false
+  24_hours: true
+
+positions:
+  - Supply Chain Manager
+  - Logistics Manager
+  - Operations Manager
+  - Sr. Logistics Manager
+  - Supply Chain Director
+  - Business Efficiency Analyst
+  - Procurement Manager
+  - Inventory Manager
+
+locations:
+  - United States
+  - Baltimore
+  - Washington DC
+  - Remote
+
+apply_once_at_company: true
+
+distance: 100
+
+company_blacklist:
+  - wayfair
+  - Crossover
+
+title_blacklist:
+  - word1
+  - word2
+
+location_blacklist:
+  - Brazil

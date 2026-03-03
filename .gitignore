@@ -162,3 +162,7 @@ venv.bak/
 mono_crash.*
 
 job_applications/
+# Generated artifacts
+temp_resumes/
+data_folder/.active_profile
+data_folder/.oauth2_temp.yaml
