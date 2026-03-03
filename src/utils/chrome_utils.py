@@ -31,7 +31,13 @@ def chrome_browser_options():
     options.add_argument("--incognito")
     options.add_argument("--allow-file-access-from-files")  # Consente l'accesso ai file locali
     options.add_argument("--disable-web-security")         # Disabilita la sicurezza web
-    logger.debug("Using Chrome in incognito mode")
+    # Run headless when no display is available (e.g. Codespaces / server environments)
+    import os
+    if not os.environ.get("DISPLAY") and os.name != "nt":
+        options.add_argument("--headless=new")
+        logger.debug("No DISPLAY found — running Chrome in headless mode")
+    else:
+        logger.debug("Using Chrome in incognito mode")
     
     return options
 

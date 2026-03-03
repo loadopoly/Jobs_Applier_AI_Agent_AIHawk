@@ -48,14 +48,21 @@ def _extract_positions_from_text(text: str) -> List[str]:
         line = line.strip()
         if 4 <= len(line) <= 80:
             lower = line.lower()
-            if any(hint in lower for hint in _TITLE_HINTS):
+            # Skip lines ending with punctuation (sentences, not titles)
+            if line.endswith(('.', ',', ';', ':')):
+                continue
+            # Skip lines containing digits mixed with words (metrics, not titles)
+            if re.search(r'\d', line):
+                continue
+            # Match hints as whole words to avoid "leading" matching "lead"
+            if any(re.search(r'\b' + re.escape(hint.strip()) + r'\b', lower) for hint in _TITLE_HINTS):
                 # Skip lines that are clearly sentences (contain ". ")
                 if ". " not in line and len(line.split()) <= 8:
                     normalized = line.title()
                     if normalized not in seen:
                         positions.append(normalized)
                         seen.add(normalized)
-    return positions[:6]
+    return positions[:8]
 
 
 def _extract_skills_from_text(text: str) -> List[str]:
