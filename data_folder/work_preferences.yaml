@@ -26,10 +26,20 @@ date:
   24_hours: true
 
 positions:
-  - Software engineer
+  - Supply Chain Manager
+  - Logistics Manager
+  - Operations Manager
+  - Sr. Logistics Manager
+  - Supply Chain Director
+  - Business Efficiency Analyst
+  - Procurement Manager
+  - Inventory Manager
 
 locations:
-  - Germany
+  - United States
+  - Baltimore
+  - Washington DC
+  - Remote
 
 apply_once_at_company: true
 

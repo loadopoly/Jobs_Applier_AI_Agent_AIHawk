@@ -1,0 +1,6 @@
+email_address: loadopoly@gmail.com
+folder: INBOX
+imap_host: imap.gmail.com
+imap_port: 993
+password: '***'
+use_ssl: true

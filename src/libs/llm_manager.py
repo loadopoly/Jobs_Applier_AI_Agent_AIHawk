@@ -20,11 +20,243 @@ from langchain_core.prompt_values import StringPromptValue
 from langchain_core.prompts import ChatPromptTemplate
 from Levenshtein import distance
 
-# Shim for missing prompts module
+# Prompts module – full implementation of all templates used by GPTAnswerer
 class PromptsShim:
     def __init__(self):
-        self.summarize_job_description = "Summarize the following job description in a few sentences."
-        self.is_job_suitable = "On a scale of 1-10, how suitable is this job for the candidate based on their resume? Return only the score."
+        # ── Job description summarisation ────────────────────────────────────
+        self.summarize_prompt_template = """
+You are an expert recruiter.  Summarize the following job description in 3-5 concise sentences,
+highlighting the key responsibilities, required skills, and company/team context.
+
+Job description:
+{text}
+
+Summary:"""
+
+        # ── Job suitability / ATS scoring ────────────────────────────────────
+        self.is_relavant_position_template = """
+You are an expert career coach and ATS evaluator.
+
+Candidate resume:
+{resume}
+
+Job description:
+{job_description}
+
+Rate how well the candidate's background matches this role on a scale from 1 to 10.
+Respond in exactly this format (two lines only):
+Score: <number>
+Reasoning: <one sentence explanation>"""
+
+        # ── Section classifier ───────────────────────────────────────────────
+        self.determine_section_template = """
+Classify which single section of a job application the following question belongs to.
+Choose exactly one from this list:
+  Personal information, Self Identification, Legal Authorization, Work Preferences,
+  Education Details, Experience Details, Projects, Availability, Salary Expectations,
+  Certifications, Languages, Interests, Cover letter
+
+Question: {question}
+
+Answer with only the section name, nothing else."""
+
+        # ── Section-level answerers (all take resume_section + question) ─────
+        self.personal_information_template = """
+You are filling out a job application on behalf of the candidate.
+Use ONLY the information provided below.  Be concise and factual.
+
+Candidate personal information:
+{resume_section}
+
+Question: {question}
+
+Answer:"""
+
+        self.self_identification_template = """
+You are filling out a job application on behalf of the candidate.
+Use ONLY the information provided below.  Be concise and factual.
+
+Candidate self-identification details:
+{resume_section}
+
+Question: {question}
+
+Answer:"""
+
+        self.legal_authorization_template = """
+You are filling out a job application on behalf of the candidate.
+Use ONLY the information provided below.  Be concise and factual.
+
+Candidate legal authorization details:
+{resume_section}
+
+Question: {question}
+
+Answer:"""
+
+        self.work_preferences_template = """
+You are filling out a job application on behalf of the candidate.
+Use ONLY the information provided below.  Be concise and factual.
+
+Candidate work preferences:
+{resume_section}
+
+Question: {question}
+
+Answer:"""
+
+        self.education_details_template = """
+You are filling out a job application on behalf of the candidate.
+Use ONLY the information provided below.  Be concise and factual.
+
+Candidate education details:
+{resume_section}
+
+Question: {question}
+
+Answer:"""
+
+        self.experience_details_template = """
+You are filling out a job application on behalf of the candidate.
+Use ONLY the information provided below.  Be concise and factual.
+
+Candidate experience details:
+{resume_section}
+
+Question: {question}
+
+Answer:"""
+
+        self.projects_template = """
+You are filling out a job application on behalf of the candidate.
+Use ONLY the information provided below.  Be concise and factual.
+
+Candidate projects:
+{resume_section}
+
+Question: {question}
+
+Answer:"""
+
+        self.availability_template = """
+You are filling out a job application on behalf of the candidate.
+Use ONLY the information provided below.  Be concise and factual.
+
+Candidate availability details:
+{resume_section}
+
+Question: {question}
+
+Answer:"""
+
+        self.salary_expectations_template = """
+You are filling out a job application on behalf of the candidate.
+Use ONLY the information provided below.  Be concise and factual.
+
+Candidate salary expectations:
+{resume_section}
+
+Question: {question}
+
+Answer (provide a specific number or range in USD if not otherwise indicated):"""
+
+        self.certifications_template = """
+You are filling out a job application on behalf of the candidate.
+Use ONLY the information provided below.  Be concise and factual.
+
+Candidate certifications:
+{resume_section}
+
+Question: {question}
+
+Answer:"""
+
+        self.languages_template = """
+You are filling out a job application on behalf of the candidate.
+Use ONLY the information provided below.  Be concise and factual.
+
+Candidate languages:
+{resume_section}
+
+Question: {question}
+
+Answer:"""
+
+        self.interests_template = """
+You are filling out a job application on behalf of the candidate.
+Use ONLY the information provided below.  Be concise and factual.
+
+Candidate interests:
+{resume_section}
+
+Question: {question}
+
+Answer:"""
+
+        # ── Cover letter ─────────────────────────────────────────────────────
+        self.coverletter_template = """
+You are an expert cover letter writer.
+Write a compelling, personalised cover letter (3-4 paragraphs, ~250 words) for the candidate,
+tailored to the specific company and role.
+
+Candidate resume:
+{resume}
+
+Target company: {company}
+
+Job description:
+{job_description}
+
+Cover letter (start directly with "Dear Hiring Manager," – no preamble):"""
+
+        # ── Numeric questions ────────────────────────────────────────────────
+        self.numeric_question_template = """
+You are filling out a job application.  Answer the following numeric question strictly based
+on the candidate's education, work experience, and projects.
+Return a single integer only (no units, no text, just the number).
+
+Education history:
+{resume_educations}
+
+Work history:
+{resume_jobs}
+
+Projects:
+{resume_projects}
+
+Question: {question}
+
+Numeric answer:"""
+
+        # ── Multiple-choice / option selector ────────────────────────────────
+        self.options_template = """
+You are filling out a job application on behalf of the candidate.
+Choose the single most appropriate answer from the provided options.
+
+Candidate resume summary:
+{resume}
+
+Candidate application profile:
+{job_application_profile}
+
+Question: {question}
+Options: {options}
+
+Reply with only the exact text of the best matching option, nothing else."""
+
+        # ── Resume vs cover letter classifier ────────────────────────────────
+        self.resume_or_cover_letter_template = """
+Determine whether the following phrase refers to a resume or a cover letter.
+Reply with exactly one word: either "resume" or "cover".
+
+Phrase: {phrase}
+
+Answer:"""
+
+        # ── Legacy two-field shim kept for any direct attribute access ────────
+        self.summarize_job_description = self.summarize_prompt_template
+        self.is_job_suitable = self.is_relavant_position_template
+
 
 prompts = PromptsShim()
 
