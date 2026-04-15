@@ -50,3 +50,11 @@ location_blacklist:
 inbox_scan_enabled: true
 inbox_scan_lookback_hours: 168
 
+# Always-active agent scheduler (web dashboard only)
+# When agent_enabled is true, the server automatically runs a job-application
+# batch every agent_interval_hours without any manual triggering.
+agent_enabled: false
+agent_interval_hours: 4
+agent_batch_count: 5
+agent_platform: linkedin   # linkedin | indeed | all
+
