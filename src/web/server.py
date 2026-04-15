@@ -1,6 +1,8 @@
 import shutil
 import threading
 import time
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
@@ -43,6 +45,176 @@ def batch_log_sink(message):
     batch_logs.append(log_line)
     if len(batch_logs) > 500:
         batch_logs.pop(0)
+
+
+# ---------------------------------------------------------------------------
+# Always-active agent scheduler
+# ---------------------------------------------------------------------------
+
+WORK_PREFS_PATH = Path("data_folder/work_preferences.yaml")
+
+class AgentScheduler:
+    """Background daemon that fires job-application batches on a fixed interval."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+
+        # Runtime state (updated from work_preferences.yaml each cycle)
+        self.enabled: bool = False
+        self.interval_hours: float = 4.0
+        self.batch_count: int = 5
+        self.platform: str = "linkedin"
+
+        self.last_run: Optional[datetime] = None
+        self.next_run: Optional[datetime] = None
+
+    # ------------------------------------------------------------------
+    # Public interface
+    # ------------------------------------------------------------------
+
+    def start(self):
+        """Start the scheduler thread (idempotent)."""
+        with self._lock:
+            if self._thread and self._thread.is_alive():
+                return
+            self._stop_event.clear()
+            self._thread = threading.Thread(target=self._loop, daemon=True, name="AgentScheduler")
+            self._thread.start()
+        logger.info("AgentScheduler started.")
+
+    def stop(self):
+        """Signal the scheduler to stop and wait briefly for it to exit."""
+        self._stop_event.set()
+        if self._thread:
+            self._thread.join(timeout=5)
+        logger.info("AgentScheduler stopped.")
+
+    def update_config(self, *, enabled: bool, interval_hours: float,
+                      batch_count: int, platform: str):
+        """Update runtime config in-place; the running loop picks it up on the next cycle."""
+        self.enabled = enabled
+        self.interval_hours = max(0.5, interval_hours)
+        self.batch_count = max(1, batch_count)
+        self.platform = platform
+        if enabled:
+            self.next_run = datetime.now(tz=timezone.utc)  # trigger immediately on next wake
+        logger.info(
+            f"AgentScheduler config updated: enabled={enabled}, "
+            f"interval={self.interval_hours}h, count={self.batch_count}, platform={self.platform}"
+        )
+
+    def status(self) -> Dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "interval_hours": self.interval_hours,
+            "batch_count": self.batch_count,
+            "platform": self.platform,
+            "last_run": self.last_run.isoformat() if self.last_run else None,
+            "next_run": self.next_run.isoformat() if self.next_run else None,
+        }
+
+    # ------------------------------------------------------------------
+    # Internal loop
+    # ------------------------------------------------------------------
+
+    def _load_prefs(self):
+        """Reload agent settings from work_preferences.yaml."""
+        try:
+            if WORK_PREFS_PATH.exists():
+                with open(WORK_PREFS_PATH, "r", encoding="utf-8") as fh:
+                    prefs = yaml.safe_load(fh) or {}
+                self.enabled = bool(prefs.get("agent_enabled", False))
+                self.interval_hours = float(prefs.get("agent_interval_hours", 4))
+                self.batch_count = int(prefs.get("agent_batch_count", 5))
+                self.platform = str(prefs.get("agent_platform", "linkedin"))
+        except Exception as exc:
+            logger.warning(f"AgentScheduler: could not load prefs: {exc}")
+
+    def _loop(self):
+        """Main scheduler loop. Sleeps 60 s between checks to stay responsive."""
+        POLL_INTERVAL = 60  # seconds
+        while not self._stop_event.is_set():
+            self._load_prefs()
+            now = datetime.now(tz=timezone.utc)
+
+            if self.enabled:
+                if self.next_run is None:
+                    # First boot with agent enabled — schedule the first run immediately
+                    self.next_run = now
+
+                if now >= self.next_run:
+                    self._fire()
+                    self.last_run = datetime.now(tz=timezone.utc)
+                    self.next_run = self.last_run + timedelta(hours=self.interval_hours)
+
+            self._stop_event.wait(POLL_INTERVAL)
+
+    def _fire(self):
+        """Run one batch cycle (and optional email scan) in the shared batch thread."""
+        global batch_active
+        if batch_active:
+            logger.info("AgentScheduler: skipping cycle — a batch is already running.")
+            return
+
+        logger.info(
+            f"AgentScheduler: firing scheduled batch "
+            f"(platform={self.platform}, count={self.batch_count})"
+        )
+        payload = RunBatchRequest(
+            platform=self.platform,
+            count=self.batch_count,
+            dry_run=False,
+        )
+        # Reuse the existing batch thread infrastructure
+        t = threading.Thread(target=_run_batch_thread, args=(payload,), daemon=True)
+        t.start()
+        t.join()  # wait so we don't overlap with email scan below
+
+        # Auto email scan after batch
+        try:
+            cfg = load_email_config()
+            if cfg:
+                logger.info("AgentScheduler: running post-batch email scan…")
+                cfg = _resolve_email_config(cfg)
+                if cfg.get("password"):
+                    monitor = EmailMonitor.from_config(cfg)
+                    events = monitor.scan_since(hours=48)
+                    classified = EmailMonitor.events_to_list(events)
+                    tailor = ResumeTailor()
+                    for event in classified:
+                        if event["classification"] == "unknown":
+                            continue
+                        company_hint = event.get("company_hint", "").lower()
+                        if not company_hint:
+                            continue
+                        for tr in list_tailored_resumes():
+                            if tr.status != "pending":
+                                continue
+                            if company_hint in tr.company.lower() or tr.company.lower() in company_hint:
+                                if event["classification"] == "rejection":
+                                    tailor.discard(tr)
+                                elif event["classification"] == "pipeline":
+                                    tailor.confirm(tr)
+                                break
+        except Exception as exc:
+            logger.warning(f"AgentScheduler: email scan failed: {exc}")
+
+
+# Singleton scheduler instance
+_agent_scheduler = AgentScheduler()
+
+
+# ---------------------------------------------------------------------------
+# FastAPI lifespan (replaces @app.on_event which is deprecated)
+# ---------------------------------------------------------------------------
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    _agent_scheduler.start()
+    yield
+    _agent_scheduler.stop()
 
 # ---------------------------------------------------------------------------
 # Pydantic models
@@ -89,7 +261,7 @@ class ProfileSwitchRequest(BaseModel):
 # App setup
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="AIHawk Web", version="0.7.0")
+app = FastAPI(title="AIHawk Web", version="0.9.0", lifespan=_lifespan)
 static_dir = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
@@ -203,7 +375,7 @@ def index():
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "version": "0.7.0"}
+    return {"status": "ok", "version": "0.9.0"}
 
 
 @app.get("/api/secrets")
@@ -767,3 +939,41 @@ def get_oauth2_status():
             "expired": tokens.is_expired()
         }
     return {"configured": False}
+
+
+# ---------------------------------------------------------------------------
+# Always-active agent scheduler endpoints
+# ---------------------------------------------------------------------------
+
+class AgentConfigRequest(BaseModel):
+    enabled: bool
+    interval_hours: float = Field(default=4.0, ge=0.5, le=168.0)
+    batch_count: int = Field(default=5, ge=1, le=100)
+    platform: Literal["linkedin", "indeed", "all"] = "linkedin"
+
+
+@app.get("/api/agent/status")
+def get_agent_status():
+    """Return the current state of the always-active scheduler."""
+    return _agent_scheduler.status()
+
+
+@app.post("/api/agent/config")
+def set_agent_config(payload: AgentConfigRequest):
+    """Enable/disable or reconfigure the always-active scheduler at runtime.
+
+    Changes take effect within one poll cycle (≤ 60 s). To persist across
+    restarts also update ``agent_enabled`` / ``agent_interval_hours`` /
+    ``agent_batch_count`` / ``agent_platform`` in
+    ``data_folder/work_preferences.yaml``.
+    """
+    _agent_scheduler.update_config(
+        enabled=payload.enabled,
+        interval_hours=payload.interval_hours,
+        batch_count=payload.batch_count,
+        platform=payload.platform,
+    )
+    return {
+        "status": "updated",
+        "agent": _agent_scheduler.status(),
+    }
