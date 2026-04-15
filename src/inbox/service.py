@@ -71,6 +71,7 @@ class InboxScanService:
             "source_email": summary.source_email,
             "lookback_hours": summary.lookback_hours,
             "total_messages": summary.total_messages,
+            "offer_messages": summary.offer_messages,
             "rejection_messages": summary.rejection_messages,
             "recruiter_messages": summary.recruiter_messages,
             "interview_messages": summary.interview_messages,

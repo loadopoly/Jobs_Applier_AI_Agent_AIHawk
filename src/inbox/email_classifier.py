@@ -24,6 +24,19 @@ INTERVIEW_PATTERNS = [
     r"next step",
 ]
 
+OFFER_PATTERNS = [
+    r"pleased to offer you",
+    r"excited to offer you",
+    r"offer of employment",
+    r"job offer",
+    r"formal offer",
+    r"offer letter",
+    r"we would like to offer",
+    r"we are offering you",
+    r"congratulations.*offer",
+    r"offer.*position",
+]
+
 RECRUITER_PATTERNS = [
     r"recruiter",
     r"talent acquisition",
@@ -41,6 +54,9 @@ def _contains_pattern(text: str, patterns: list[str]) -> bool:
 
 def classify_email(message: EmailMessage) -> Tuple[EmailCategory, str]:
     combined_text = f"{message.subject}\n{message.body}"
+
+    if _contains_pattern(combined_text, OFFER_PATTERNS):
+        return EmailCategory.OFFER, "matched offer intent keywords"
 
     if _contains_pattern(combined_text, INTERVIEW_PATTERNS):
         return EmailCategory.INTERVIEW, "matched interview intent keywords"

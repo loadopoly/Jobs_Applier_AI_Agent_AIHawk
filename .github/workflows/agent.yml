@@ -1,0 +1,125 @@
+name: Always-Active Agent
+
+# Run automatically every 4 hours AND allow manual triggering via the
+# GitHub Actions "Run workflow" button.
+on:
+  schedule:
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to apply on (linkedin | indeed | all)'
+        required: false
+        default: 'linkedin'
+      count:
+        description: 'Number of applications per run'
+        required: false
+        default: '5'
+      dry_run:
+        description: 'Dry-run mode (true skips real submissions)'
+        required: false
+        default: 'false'
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Write data_folder config from secrets
+        env:
+          SECRETS_YAML: ${{ secrets.SECRETS_YAML }}
+          WORK_PREFS_YAML: ${{ secrets.WORK_PREFS_YAML }}
+          RESUME_YAML: ${{ secrets.RESUME_YAML }}
+        run: |
+          mkdir -p data_folder/output
+          # Write secrets.yaml (required – must be set in repo secrets)
+          if [ -z "$SECRETS_YAML" ]; then
+            echo "ERROR: SECRETS_YAML repo secret is not set." >&2
+            exit 1
+          fi
+          echo "$SECRETS_YAML" > data_folder/secrets.yaml
+
+          # Write work_preferences.yaml (optional – falls back to example)
+          if [ -n "$WORK_PREFS_YAML" ]; then
+            echo "$WORK_PREFS_YAML" > data_folder/work_preferences.yaml
+          else
+            cp data_folder_example/work_preferences.yaml data_folder/work_preferences.yaml
+          fi
+
+          # Write resume (optional)
+          if [ -n "$RESUME_YAML" ]; then
+            echo "$RESUME_YAML" > data_folder/plain_text_resume.yaml
+          fi
+
+      - name: Run agent batch
+        env:
+          PLATFORM: ${{ github.event.inputs.platform || 'linkedin' }}
+          COUNT: ${{ github.event.inputs.count || '5' }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          python - <<'EOF'
+          import json, pathlib, sys
+          sys.path.insert(0, ".")
+          import yaml
+          from src.bots.bot_manager import BotManager
+          from src.libs.resume_parser import extract_positions
+
+          data_folder  = pathlib.Path("data_folder")
+          secrets_file = data_folder / "secrets.yaml"
+          config_file  = data_folder / "work_preferences.yaml"
+          resume_path  = data_folder / "plain_text_resume.yaml"
+
+          with open(config_file, encoding="utf-8") as fh:
+              config = yaml.safe_load(fh) or {}
+
+          config["uploads"] = {"plainTextResume": resume_path}
+          config["outputFileDirectory"] = data_folder / "output"
+          config["secretsFile"] = secrets_file
+
+          # Pull positions from resume if available
+          if resume_path.exists():
+              positions = extract_positions(resume_path)
+              if positions:
+                  config["positions"] = positions
+
+          import os
+          platform = os.environ.get("PLATFORM", "linkedin")
+          count    = int(os.environ.get("COUNT", "5"))
+          dry_run  = os.environ.get("DRY_RUN", "false").lower() == "true"
+          config["dry_run"] = dry_run
+
+          with open(secrets_file, encoding="utf-8") as fh:
+              secrets = yaml.safe_load(fh) or {}
+
+          llm_api_key = ""
+          for key in ["gemini_api_key", "openai_api_key", "claude_api_key",
+                      "huggingface_api_key", "perplexity_api_key", "llm_api_key"]:
+              v = secrets.get(key)
+              if v:
+                  llm_api_key = v
+                  break
+
+          manager = BotManager(secrets=secrets, config=config, llm_api_key=llm_api_key)
+
+          if platform == "all":
+              manager.run_batch("linkedin", count)
+              manager.run_batch("indeed", count)
+          else:
+              manager.run_batch(platform, count)
+
+          print("✅ Agent batch complete.")
+          EOF
