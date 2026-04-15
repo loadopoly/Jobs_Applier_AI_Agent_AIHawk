@@ -45,3 +45,33 @@ def test_classify_recruiter_message():
 
     assert category == EmailCategory.RECRUITER
     assert "recruiter" in reason
+
+
+def test_classify_offer_message():
+    message = EmailMessage(
+        uid="4",
+        subject="Your offer letter from Acme Corp",
+        sender="hr@acme.com",
+        received_at="2026-01-01T00:00:00Z",
+        body="We are pleased to offer you the position of Software Engineer. Please find the offer letter attached.",
+    )
+
+    category, reason = classify_email(message)
+
+    assert category == EmailCategory.OFFER
+    assert "offer" in reason
+
+
+def test_classify_offer_not_misclassified_as_interview():
+    message = EmailMessage(
+        uid="5",
+        subject="Congratulations — Offer of Employment",
+        sender="hr@bigco.com",
+        received_at="2026-01-01T00:00:00Z",
+        body="Congratulations! We are excited to offer you the role. Your start date will be discussed in your onboarding interview.",
+    )
+
+    category, reason = classify_email(message)
+
+    assert category == EmailCategory.OFFER
+    assert "offer" in reason

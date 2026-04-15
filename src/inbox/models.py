@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 
 
 class EmailCategory(str, Enum):
+    OFFER = "offer"
     REJECTION = "rejection"
     RECRUITER = "recruiter"
     INTERVIEW = "interview"
@@ -26,6 +27,7 @@ class ScanSummary:
     source_email: str
     lookback_hours: int
     total_messages: int
+    offer_messages: int
     rejection_messages: int
     recruiter_messages: int
     interview_messages: int
@@ -53,6 +55,7 @@ class ScanSummary:
             source_email=source_email,
             lookback_hours=lookback_hours,
             total_messages=total_messages,
+            offer_messages=len(categorized_messages.get(EmailCategory.OFFER, [])),
             rejection_messages=len(categorized_messages.get(EmailCategory.REJECTION, [])),
             recruiter_messages=len(categorized_messages.get(EmailCategory.RECRUITER, [])),
             interview_messages=len(categorized_messages.get(EmailCategory.INTERVIEW, [])),
