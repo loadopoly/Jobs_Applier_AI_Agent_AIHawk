@@ -182,3 +182,75 @@ Connect your IMAP email box to auto-classify incoming messages. Use [App Passwor
 | `GET` | `/api/email/config` | Check email config status |
 
 
+---
+
+## Always-active agent scheduler (v0.9.0)
+
+AIHawk can now run **completely autonomously** — no manual clicking required.
+There are two ways to keep the agent alive around the clock:
+
+### Option A — Local always-on (web server)
+
+Start the web server once:
+
+```bash
+python run_web.py
+```
+
+Then enable the scheduler either via the API:
+
+```bash
+curl -X POST http://localhost:8000/api/agent/config \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled": true, "interval_hours": 4, "batch_count": 5, "platform": "linkedin"}'
+```
+
+Or persistently via `data_folder/work_preferences.yaml`:
+
+```yaml
+agent_enabled: true
+agent_interval_hours: 4    # run every 4 hours
+agent_batch_count: 5       # apply to up to 5 jobs per cycle
+agent_platform: linkedin   # linkedin | indeed | all
+```
+
+The background scheduler wakes every 60 s, checks whether it is time to fire
+a new batch, and—if no batch is currently running—launches it automatically.
+After each batch it also runs an email inbox scan to keep the pipeline tracker
+up to date.
+
+Check scheduler state at any time:
+
+```bash
+curl http://localhost:8000/api/agent/status
+```
+
+### Option B — Cloud always-on (GitHub Actions)
+
+The repository ships with `.github/workflows/agent.yml`, which runs the agent
+on a **cron schedule (every 4 hours)** using GitHub-hosted runners — so it
+works even when your machine is off.
+
+**Setup (one-time)**:
+
+1. Go to **Settings → Secrets and variables → Actions** in your fork.
+2. Add the following repository secrets:
+
+| Secret | Content |
+|---|---|
+| `SECRETS_YAML` | Full contents of your `data_folder/secrets.yaml` |
+| `WORK_PREFS_YAML` | *(optional)* Full contents of `data_folder/work_preferences.yaml` |
+| `RESUME_YAML` | *(optional)* Full contents of `data_folder/plain_text_resume.yaml` |
+
+3. Push to `main` (or any branch) — the workflow activates automatically.
+
+You can also trigger a one-off run at any time from
+**Actions → Always-Active Agent → Run workflow**.
+
+### New API endpoints (v0.9.0)
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/agent/status` | Scheduler state (enabled, last/next run) |
+| `POST` | `/api/agent/config` | Enable/disable or reconfigure scheduler |
+

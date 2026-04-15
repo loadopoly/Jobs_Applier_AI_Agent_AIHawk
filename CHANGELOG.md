@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.9.0] - 2026-04-15
+
+### Added
+- **Always-active agent scheduler** — the web server now ships with an
+  `AgentScheduler` background thread that fires job-application batches
+  automatically on a configurable interval (default 4 hours) without any
+  manual interaction.
+  - Enable via `agent_enabled: true` in `data_folder/work_preferences.yaml`
+    (persists across restarts) or via `POST /api/agent/config` at runtime.
+  - Scheduler settings: `agent_interval_hours`, `agent_batch_count`,
+    `agent_platform` (`linkedin` | `indeed` | `all`).
+  - After each batch the scheduler also triggers an email inbox scan to
+    auto-confirm / auto-discard jobs in the pipeline tracker.
+- **GitHub Actions cron workflow** (`.github/workflows/agent.yml`) — runs the
+  agent on a cloud runner every 4 hours via `schedule: cron: '0 */4 * * *'`.
+  Supports `workflow_dispatch` for on-demand runs with custom `platform`,
+  `count`, and `dry_run` inputs.  Reads credentials from repository secrets
+  (`SECRETS_YAML`, `WORK_PREFS_YAML`, `RESUME_YAML`).
+- New API endpoints:
+  - `GET /api/agent/status` — scheduler state (enabled, interval, last/next run)
+  - `POST /api/agent/config` — reconfigure scheduler at runtime
+- Updated `data_folder_example/work_preferences.yaml` with the four new
+  `agent_*` keys (all commented/off by default).
+- FastAPI app now uses the modern `lifespan` context manager instead of the
+  deprecated `@app.on_event("startup")` pattern.
+
 ## [0.8.0] - 2026-03-03
 
 ### Fixed
