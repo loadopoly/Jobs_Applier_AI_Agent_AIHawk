@@ -1,9 +1,24 @@
 import logging.handlers
 import os
 import sys
-import logging
-from loguru import logger
-from selenium.webdriver.remote.remote_connection import LOGGER as selenium_logger
+try:
+    from loguru import logger
+    has_loguru = True
+except ImportError:
+    has_loguru = False
+    logger = logging.getLogger("JobHawk")
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)-8s | %(name)s - %(message)s"))
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+
+try:
+    from selenium.webdriver.remote.remote_connection import LOGGER as selenium_logger
+    has_selenium = True
+except ImportError:
+    has_selenium = False
+    selenium_logger = logging.getLogger("selenium")
 
 from config import LOG_LEVEL, LOG_SELENIUM_LEVEL, LOG_TO_CONSOLE, LOG_TO_FILE
 
@@ -75,6 +90,8 @@ def init_selenium_logger():
     selenium_logger.addHandler(file_handler)
 
 
-remove_default_loggers()
-init_loguru_logger()
-init_selenium_logger()
+if has_loguru:
+    remove_default_loggers()
+    init_loguru_logger()
+if has_selenium:
+    init_selenium_logger()
