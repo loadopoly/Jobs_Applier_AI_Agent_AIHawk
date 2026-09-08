@@ -1,0 +1,21 @@
+{
+  "name": "jobs-applier-ai-agent-aihawk",
+  "version": "1.0.0",
+  "description": "Jobs Applier AI Agent AIHawk - Playwright Automation and Tools",
+  "main": "playwright_cover_letter.js",
+  "scripts": {
+    "cover-letter": "node playwright_cover_letter.js",
+    "start": "node playwright_cover_letter.js"
+  },
+  "keywords": [
+    "job-applier",
+    "playwright",
+    "cover-letter",
+    "automation"
+  ],
+  "author": "loadopoly",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}

@@ -1,6 +1,7 @@
 # application files and logs
 /generated_cv
 /log/*
+node_modules/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

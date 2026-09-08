@@ -758,6 +758,20 @@ def handle_inquiries(selected_actions: List[str], parameters: dict, llm_api_key:
                 logger.info("Preparing for recruiter conversation...")
                 generate_recruiter_briefing(parameters, require_llm_key())
 
+            if "Generate LinkedIn Cover Letter (Playwright)" == selected_actions:
+                logger.info("Generating tailored LinkedIn cover letter using Playwright...")
+                from src.libs.playwright_cover_letter import run_playwright_cover_letter
+                questions = [
+                    inquirer.Text(
+                        'job_url',
+                        message="Please enter the LinkedIn Job URL (press Enter for default):",
+                        default="https://www.linkedin.com/jobs/view/4451271011/"
+                    )
+                ]
+                answers = inquirer.prompt(questions)
+                job_url = (answers.get('job_url') if answers else "") or "https://www.linkedin.com/jobs/view/4451271011/"
+                run_playwright_cover_letter(job_url)
+
         else:
             logger.warning("No actions selected. Nothing to execute.")
     except Exception as e:
@@ -777,6 +791,7 @@ def prompt_user_action() -> str:
                 message="Select the action you want to perform:",
                 choices=[
                     "Generate Resume",
+                    "Generate LinkedIn Cover Letter (Playwright)",
                     "Start Application Bot (Auto-Apply)",
                     "ATS Scorer (Analyze Job Match)",
                     "Generate Recruiter Briefing Card",
