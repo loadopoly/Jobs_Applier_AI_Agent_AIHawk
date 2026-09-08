@@ -1,8 +1,9 @@
 import subprocess
 import sys
+import json
 import logging
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any
 
 try:
     from src.logging import logger
@@ -10,12 +11,16 @@ except ImportError:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     logger = logging.getLogger("JobHawk")
 
-def run_playwright_cover_letter(job_url: Optional[str] = None) -> Tuple[str, Path]:
+
+def run_playwright_cover_letter(job_url: Optional[str] = None, auto_update_app: bool = True) -> Dict[str, Any]:
     """
-    Executes the Playwright-based LinkedIn cover letter generator script.
+    Executes the Playwright-based LinkedIn cover letter generator script,
+    tailors the application with regards to the live posting, and updates
+    JobHawk's live application records.
     
     :param job_url: URL to the LinkedIn job posting.
-    :return: (cover_letter_text, output_file_path)
+    :param auto_update_app: Whether to automatically create/update the job application in job_applications/.
+    :return: Dictionary with execution details and file paths.
     """
     repo_root = Path(__file__).resolve().parent.parent.parent
     script_path = repo_root / "playwright_cover_letter.js"
@@ -26,8 +31,11 @@ def run_playwright_cover_letter(job_url: Optional[str] = None) -> Tuple[str, Pat
     cmd = ["node", str(script_path)]
     if job_url:
         cmd.append(job_url)
+    if auto_update_app:
+        cmd.append("--auto")
+    cmd.append("--json")
         
-    logger.info(f"Running Playwright LinkedIn cover letter generator for: {job_url or 'default posting'}")
+    logger.info(f"Running automated Playwright LinkedIn live application updater for: {job_url or 'default posting'}")
     
     result = subprocess.run(
         cmd,
@@ -41,12 +49,16 @@ def run_playwright_cover_letter(job_url: Optional[str] = None) -> Tuple[str, Pat
         logger.error(f"Playwright script failed with code {result.returncode}: {result.stderr}")
         raise RuntimeError(f"Playwright script failed: {result.stderr or result.stdout}")
         
-    output_text = result.stdout
-    print(output_text)
+    raw_output = result.stdout
+    print(raw_output)
     
-    # Locate the output file
-    output_dir = repo_root / "data_folder" / "output"
-    saved_files = sorted(output_dir.glob("cover_letter_*.txt"), key=lambda p: p.stat().st_mtime, reverse=True)
-    latest_file = saved_files[0] if saved_files else output_dir / "cover_letter_latest.txt"
-    
-    return output_text, latest_file
+    # Extract JSON summary if present
+    parsed_json = {}
+    if "--- JSON RESULT ---" in raw_output:
+        try:
+            json_str = raw_output.split("--- JSON RESULT ---")[-1].strip()
+            parsed_json = json.loads(json_str)
+        except Exception as e:
+            logger.warning(f"Could not parse JSON output from Playwright runner: {e}")
+            
+    return parsed_json

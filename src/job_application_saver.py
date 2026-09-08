@@ -76,17 +76,23 @@ class ApplicationSaver:
         saver.create_application_directory()
         saver.save_application_details()
         saver.save_job_description()
-        # todo: tempory fix, to rely on resume and cv path from job object instead of job application object
-        if job_application.resume_path:
+        # Resolve resume path from application or job
+        res_path = job_application.resume_path or getattr(job_application.job, "resume_path", "")
+        if res_path and os.path.exists(res_path):
             saver.save_file(
                 saver.job_application_files_path,
-                job_application.job.resume_path,
+                res_path,
                 "resume.pdf",
             )
-        logger.debug(f"Saving cover letter to path: {job_application.cover_letter_path}")
-        if job_application.cover_letter_path:
+            
+        # Resolve cover letter path from application or job
+        cl_path = job_application.cover_letter_path or getattr(job_application.job, "cover_letter_path", "")
+        logger.debug(f"Saving cover letter to path: {cl_path}")
+        if cl_path and os.path.exists(cl_path):
+            ext = os.path.splitext(cl_path)[1].lower() or ".txt"
+            target_name = f"cover_letter{ext}"
             saver.save_file(
                 saver.job_application_files_path,
-                job_application.job.cover_letter_path,
-                "cover_letter.pdf"
+                cl_path,
+                target_name
             )

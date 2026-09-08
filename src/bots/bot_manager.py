@@ -110,6 +110,18 @@ class BotManager:
                         except Exception as te:
                             logger.warning(f"Resume tailoring skipped: {te}")
 
+                        # ── Generate tailored cover letter using Playwright ──
+                        cover_letter_path = ""
+                        try:
+                            logger.info(f"Generating Playwright tailored cover letter for {job.role} at {job.company}")
+                            from src.libs.playwright_cover_letter import run_playwright_cover_letter
+                            cl_res = run_playwright_cover_letter(job.link or "", auto_update_app=False)
+                            cover_letter_path = cl_res.get("outputFilePdf") or cl_res.get("outputFileTxt") or ""
+                            if cover_letter_path:
+                                job.cover_letter_path = cover_letter_path
+                        except Exception as cle:
+                            logger.warning(f"Cover letter generation skipped: {cle}")
+
                         if dry_run:
                             application = JobApplication(
                                 job=job,
@@ -120,6 +132,8 @@ class BotManager:
                             application = bot.apply(job)
 
                         application.application_data = analysis
+                        if cover_letter_path:
+                            application.cover_letter_path = cover_letter_path
                         if tailored:
                             application.tailored_resume_path = str(tailored.pdf_path or tailored.tailored_yaml_path)
                             application.tailored_resume_status = tailored.status
@@ -127,12 +141,20 @@ class BotManager:
 
                         ApplicationSaver.save(application)
                         applied_count += 1
-                        logger.info(f"Successfully applied to {job.role} at {job.company} | tailored_resume={'yes' if tailored else 'no'}")
+                        logger.info(f"Successfully applied to {job.role} at {job.company} | tailored_resume={'yes' if tailored else 'no'} | cover_letter={'yes' if cover_letter_path else 'no'}")
                     except Exception as e:
                         logger.error(f"Failed to apply to {job.company}: {e}")
         
         logger.info(f"Finished {platform} batch. Applied to {applied_count} jobs.")
         return applied_count
+
+    def apply_to_url(self, job_url: str) -> Dict[str, Any]:
+        """
+        Automates end-to-end processing and live application updating for a specific job URL.
+        """
+        logger.info(f"Processing automated application for live URL: {job_url}")
+        from src.libs.playwright_cover_letter import run_playwright_cover_letter
+        return run_playwright_cover_letter(job_url, auto_update_app=True)
 
     def run_linkedin_batch(self, count: int = 5):
         # Legacy method for backward compatibility
