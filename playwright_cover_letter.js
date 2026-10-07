@@ -2,6 +2,31 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 
+// Personal content (name, contact details, employer history) lives in a
+// gitignored file so the public repo never carries it:
+//   data_folder/cover_letter_profile.local.json
+// Without it the letter is generated with neutral placeholders.
+const PROFILE_PATH = path.join(__dirname, 'data_folder', 'cover_letter_profile.local.json');
+const NEUTRAL_PROFILE = {
+  name: 'Your Name',
+  contact_block: 'Your Name\nCity, ST\nphone\nemail',
+  contact_line_html: 'City, ST &bull; phone &bull; email',
+  qualifications_intro: 'In my current role, I have:',
+  qualifications: ['Describe your top accomplishments in data_folder/cover_letter_profile.local.json'],
+};
+
+function loadProfile() {
+  try {
+    return { ...NEUTRAL_PROFILE, ...JSON.parse(fs.readFileSync(PROFILE_PATH, 'utf8')) };
+  } catch (err) {
+    return NEUTRAL_PROFILE;
+  }
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
 async function launchBrowser() {
   try {
     return await chromium.launch({ headless: true });
@@ -65,9 +90,10 @@ function extractSkillsFromMarkup(htmlContent, textContent) {
 }
 
 function buildCoverLetterHtml(jobTitle, companyName, coverLetterText) {
+  const profile = loadProfile();
   const paragraphs = coverLetterText.split('\n\n').filter(p => p.trim());
   const bodyHtml = paragraphs.map(p => {
-    if (p.includes('- Built a unified multi-ERP supply chain hub')) {
+    if (p.split('\n').slice(1).some(l => /^-\s/.test(l))) {
       const lines = p.split('\n');
       const intro = lines[0];
       const items = lines.slice(1).map(l => `<li>${l.replace(/^-\s*/, '')}</li>`).join('');
@@ -122,8 +148,8 @@ function buildCoverLetterHtml(jobTitle, companyName, coverLetterText) {
 </head>
 <body>
   <div class="header">
-    <h1>ADAM GARD</h1>
-    <div class="contact-info">City, ST &bull; phone &bull; email</div>
+    <h1>${escapeHtml(profile.name.toUpperCase())}</h1>
+    <div class="contact-info">${profile.contact_line_html}</div>
   </div>
   <div class="content">
     ${bodyHtml}
@@ -258,21 +284,15 @@ async function generateCoverLetter(options = {}) {
     const { required: requiredSkills, preferred: preferredSkills } = extractSkillsFromMarkup(jobHtml, jobDescription);
 
     // Create cover letter sections tailored to the job
-    const contactBlock = `Adam Gard
-City, ST
-phone
-email`;
+    const profile = loadProfile();
+    const contactBlock = profile.contact_block;
 
     const openingParagraph = `Dear Hiring Manager,
 
 I am excited to apply for the ${jobTitle} position at ${companyName}. With my strong background in supply chain engineering, ERP integration, and inventory optimization, I am confident I would be a valuable addition to your team.`;
 
-    const keyQualifications = `As a Senior Principal Supply Chain Engineer, I have:
-- Built a unified multi-ERP supply chain hub integrating rate management, PPV, and inventory control across multiple ERPs
-- Achieved 100% policy compliance and ≥95% SKU accuracy by leading cycle count programs across manufacturing facilities
-- Developed an AI agent that reduced maintenance downtime by 42%, emergency procurement by 37%, and MTTR by 29%
-- Reduced on-hand SKUs by 96.4% while maintaining 98.3% stock-out confidence through ML-driven segmentation
-- Realized $1.02M+ in savings via team upskilling and reduced inventory variance from $1.2M to $40K`;
+    const keyQualifications = [profile.qualifications_intro,
+      ...profile.qualifications.map(q => `- ${q}`)].join('\n');
 
     const skillsSentence = requiredSkills.length > 0
       ? `combined with my ${requiredSkills.join(', ')} skills,`
@@ -283,7 +303,7 @@ I am excited to apply for the ${jobTitle} position at ${companyName}. With my st
 Thank you for your consideration.
 
 Sincerely,
-Adam Gard`;
+${profile.name}`;
 
     // Assemble the complete cover letter
     const coverLetter = `

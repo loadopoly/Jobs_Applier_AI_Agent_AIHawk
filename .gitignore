@@ -167,3 +167,13 @@ job_applications/
 temp_resumes/
 data_folder/.active_profile
 data_folder/.oauth2_temp.yaml
+
+# Personal cover-letter content (name, contact details, employer history); never published.
+data_folder/*.local.json
+# Personal data: resume, contact details, credentials, profiles. Templates (*.example.yaml) are tracked.
+data_folder/secrets.yaml
+data_folder/email_config.yaml
+data_folder/plain_text_resume.yaml
+data_folder/plain_text_resume.yaml.bak
+data_folder/work_preferences.yaml
+data_folder/profiles/

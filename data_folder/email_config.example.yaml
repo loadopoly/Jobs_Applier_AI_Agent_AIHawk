@@ -1,0 +1,7 @@
+# Template for data_folder/email_config.yaml (gitignored). Copy it, drop .example, fill in your own values.
+email_address: ''
+folder: ''
+imap_host: ''
+imap_port: 993
+password: ''
+use_ssl: true
