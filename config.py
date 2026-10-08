@@ -17,9 +17,19 @@ JOB_SUITABILITY_SCORE = 7
 JOB_MAX_APPLICATIONS = 5
 JOB_MIN_APPLICATIONS = 1
 
-# Selectable LLM provider: 'gemini' | 'openai' | 'claude' | 'ollama' | 'huggingface' | 'perplexity'
-LLM_MODEL_TYPE = 'gemini'
-# Gemini 2.5 Flash is the baseline model; change to any model supported by the chosen provider
-LLM_MODEL = 'gemini-2.5-flash'
+import os
+
+# LLM provider: 'quipu' | 'gemini' | 'openai' | 'claude' | 'ollama' | 'huggingface' | 'perplexity'
+# 'quipu' (default, 2026-09-29) uses QUIPU's own route: OpenRouter with xAI
+# fallback, model map / fallbacks / key resolution from
+# pipeline/src/brain/llm_caller_openrouter.py (see src/libs/quipu_llm.py).
+# Its key is OPENROUTER_API_KEY / XAI_API_KEY, not secrets.yaml.
+LLM_MODEL_TYPE = os.environ.get("JOBHAWK_LLM_PROVIDER", "quipu").strip().lower()
+# For 'quipu': a brain.yaml canonical ID (e.g. 'hermes-3-405b', 'glm-5.1') or a
+# vendor/slug; empty = QUIPU's default model. For other providers, their model name.
+LLM_MODEL = os.environ.get(
+    "JOBHAWK_LLM_MODEL",
+    "" if LLM_MODEL_TYPE == "quipu" else "gemini-2.5-flash",
+).strip()
 # Only required for OLLAMA models
-LLM_API_URL = ''
+LLM_API_URL = os.environ.get("JOBHAWK_LLM_API_URL", "")

@@ -16,11 +16,23 @@ from src.bots.indeed_bot import IndeedBot
 # ── LinkedInBot ──────────────────────────────────────────────────────────────
 
 class TestLinkedInBotNoDriver:
-    def test_search_returns_empty_when_driver_none(self):
+    def test_search_returns_empty_when_browser_cannot_open(self):
+        # search_jobs opens a browser on demand (public search needs no login);
+        # when that fails it returns no jobs instead of raising.
         bot = LinkedInBot(secrets={"linkedin_email": "u", "linkedin_password": "p"})
         assert bot.driver is None
-        result = bot.search_jobs("Logistics Manager", "Baltimore")
+        with patch("src.utils.chrome_utils.init_browser", side_effect=RuntimeError("no chrome")):
+            result = bot.search_jobs("Logistics Manager", "Baltimore")
         assert result == []
+        assert bot.driver is None
+
+    def test_close_quits_driver(self):
+        bot = LinkedInBot(secrets={})
+        driver = MagicMock()
+        bot.driver = driver
+        bot.close()
+        driver.quit.assert_called_once()
+        assert bot.driver is None
 
     def test_apply_returns_failed_when_driver_none(self):
         bot = LinkedInBot(secrets={})
@@ -69,9 +81,10 @@ class TestLinkedInBotNoDriver:
 # ── IndeedBot ─────────────────────────────────────────────────────────────────
 
 class TestIndeedBotNoDriver:
-    def test_search_returns_empty_when_driver_none(self):
+    def test_search_returns_empty_when_browser_cannot_open(self):
         bot = IndeedBot(secrets={})
-        result = bot.search_jobs("Supply Chain Manager", "Remote")
+        with patch("src.utils.chrome_utils.init_browser", side_effect=RuntimeError("no chrome")):
+            result = bot.search_jobs("Supply Chain Manager", "Remote")
         assert result == []
 
     def test_apply_returns_failed_when_driver_none(self):

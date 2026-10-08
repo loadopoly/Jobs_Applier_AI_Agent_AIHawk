@@ -12,6 +12,15 @@ from src.utils.chrome_utils import init_browser
 from src.logging import logger
 
 
+def _el_text(el) -> str:
+    """Visible text, falling back to textContent. Headless Chromium reports
+    .text == "" for cards scrolled out of the viewport."""
+    text = (el.text or "").strip()
+    if not text:
+        text = (el.get_attribute("textContent") or "").strip()
+    return " ".join(text.split())
+
+
 class LinkedInBot(BaseBot):
     def __init__(self, secrets: dict):
         super().__init__("linkedin")
@@ -42,8 +51,7 @@ class LinkedInBot(BaseBot):
 
     def search_jobs(self, query: str, location: str, count: int = 10) -> List[Job]:
         """Search LinkedIn jobs and return real job listings."""
-        if self.driver is None:
-            logger.error("Browser not initialized. Call login() first.")
+        if not self.ensure_browser():
             return []
 
         logger.info(f"Searching LinkedIn for '{query}' in '{location}'")
@@ -102,14 +110,24 @@ class LinkedInBot(BaseBot):
                             EC.presence_of_element_located((By.CSS_SELECTOR,
                                 ".jobs-description__content, .show-more-less-html__markup, .jobs-box__html-content"))
                         )
-                        description = desc_el.text[:3000]
+                        description = _el_text(desc_el)[:3000]
                     except Exception:
                         pass
                     
+                    role = _el_text(title_el)
+                    company = _el_text(company_el)
+                    if not role or not company:
+                        logger.debug(f"Skipping card without title/company: {link}")
+                        continue
+                    # LinkedIn's guest markup nests the same posting under more
+                    # than one matched selector; keep one Job per posting.
+                    key = link or f"{role}|{company}"
+                    if any((j.link or f"{j.role}|{j.company}") == key for j in jobs):
+                        continue
                     jobs.append(Job(
-                        role=title_el.text.strip(),
-                        company=company_el.text.strip(),
-                        location=location_el.text.strip(),
+                        role=role,
+                        company=company,
+                        location=_el_text(location_el),
                         link=link,
                         description=description,
                     ))

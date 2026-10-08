@@ -38,8 +38,7 @@ class IndeedBot(BaseBot):
 
     def search_jobs(self, query: str, location: str, count: int = 10) -> List[Job]:
         """Search Indeed for real job listings."""
-        if self.driver is None:
-            logger.error("Browser not initialized. Call login() first.")
+        if not self.ensure_browser():
             return []
 
         logger.info(f"Searching Indeed for '{query}' in '{location}'")

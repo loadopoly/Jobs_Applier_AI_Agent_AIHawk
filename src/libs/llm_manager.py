@@ -418,6 +418,41 @@ class HuggingFaceModel(AIModel):
         return response
 
 
+QUIPU = "quipu"
+
+
+class QuipuModel(AIModel):
+    """QUIPU's LLM route (OpenRouter -> xAI), resolved by QUIPU's own caller.
+    See src/libs/quipu_llm.py."""
+
+    def __init__(self, llm_model: str):
+        from src.libs import quipu_llm
+
+        self._quipu_llm = quipu_llm
+        self.model = quipu_llm.chat_model(llm_model)
+        chain = quipu_llm.status(llm_model).get("providers", [])
+        live = [f"{p['name']}:{p['models'][0]}" for p in chain if p["key_live"] and p["models"]]
+        logger.info(f"LLM provider: QUIPU route ({', '.join(live)} + fallbacks)")
+
+    def invoke(self, prompt: str) -> BaseMessage:
+        response = self.model.invoke(prompt)
+        if isinstance(getattr(response, "content", None), str):
+            try:
+                response.content = self._quipu_llm.strip_think(response.content)
+            except Exception:
+                pass
+        return response
+
+
+def llm_available(api_key: str = "") -> bool:
+    """Whether an AIAdapter can be built: the QUIPU route needs one of its own
+    keys (not a secrets.yaml key); every other provider needs api_key."""
+    if cfg.LLM_MODEL_TYPE == QUIPU:
+        from src.libs import quipu_llm
+        return quipu_llm.is_available(cfg.LLM_MODEL)
+    return bool(api_key) or cfg.LLM_MODEL_TYPE == OLLAMA
+
+
 class AIAdapter:
     def __init__(self, config: dict, api_key: str):
         self.model = self._create_model(config, api_key)
@@ -430,7 +465,9 @@ class AIAdapter:
 
         logger.debug(f"Using {llm_model_type} with {llm_model}")
 
-        if llm_model_type == OPENAI:
+        if llm_model_type == QUIPU:
+            return QuipuModel(llm_model)
+        elif llm_model_type == OPENAI:
             return OpenAIModel(api_key, llm_model)
         elif llm_model_type == CLAUDE:
             return ClaudeModel(api_key, llm_model)

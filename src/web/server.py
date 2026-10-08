@@ -18,7 +18,8 @@ from src.libs.ats_scorer import ATSScorer
 from src.libs.email_monitor import (
     EmailMonitor, load_email_config, save_email_config,
 )
-from src.libs.llm_manager import AIAdapter
+from src.libs.llm_manager import AIAdapter, QUIPU, llm_available
+import config as cfg
 from src.libs.recruiter_prep import RecruiterPrepEngine
 from src.libs.resume_converter import (
     SUPPORTED_EXTENSIONS, save_resume,
@@ -306,10 +307,17 @@ def _load_runtime():
             llm_api_key = value
             break
 
-    if not llm_api_key:
-        logger.warning("No LLM API key found; ATS/briefing endpoints need one.")
+    if not llm_available(llm_api_key):
+        logger.warning(_llm_missing_detail())
 
     return config, secrets, llm_api_key
+
+
+def _llm_missing_detail() -> str:
+    if cfg.LLM_MODEL_TYPE == QUIPU:
+        return ("QUIPU LLM route has no live key: set OPENROUTER_API_KEY (or XAI_API_KEY) "
+                "in the workspace .env and recreate jobhawk")
+    return "LLM API key missing in secrets.yaml"
 
 
 def _load_secrets() -> Dict[str, Any]:
@@ -373,9 +381,26 @@ def index():
     return FileResponse(static_dir / "index.html")
 
 
+@app.get("/health")
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "version": "0.9.0"}
+    # /health is the path HubCore probes (hub/hub_workspace.json healthPath);
+    # /api/health is kept for the bundled UI.
+    return {
+        "status": "ok",
+        "service": "jobhawk",
+        "version": "0.9.0",
+        "batch_running": batch_active,
+        "agent": _agent_scheduler.status(),
+        "llm": _llm_status(),
+    }
+
+
+def _llm_status() -> Dict[str, Any]:
+    if cfg.LLM_MODEL_TYPE == QUIPU:
+        from src.libs import quipu_llm
+        return quipu_llm.status(cfg.LLM_MODEL)
+    return {"route": cfg.LLM_MODEL_TYPE, "model": cfg.LLM_MODEL}
 
 
 @app.get("/api/secrets")
@@ -387,8 +412,14 @@ def get_secrets():
     for key in ["gemini_api_key", "openai_api_key", "claude_api_key", 
                 "huggingface_api_key", "perplexity_api_key", "llm_api_key",
                 "linkedin_email", "linkedin_password"]:
-        value = secrets.get(key, "")
-        masked[key] = value if value and value.strip() else ""
+        value = str(secrets.get(key, "") or "").strip()
+        if not value:
+            masked[key] = ""
+        elif key == "linkedin_email":
+            masked[key] = value
+        else:
+            # Never return stored keys or passwords; show only that one is set.
+            masked[key] = "********" + value[-4:] if len(value) > 8 else "********"
     return masked
 
 
@@ -567,7 +598,7 @@ def get_batch_status():
 @app.post("/api/ats-score")
 def ats_score(payload: ATSRequest):
     config, _s, llm_api_key = _load_runtime()
-    scorer = ATSScorer(AIAdapter(config, llm_api_key) if llm_api_key else None)
+    scorer = ATSScorer(AIAdapter(config, llm_api_key) if llm_available(llm_api_key) else None)
     return scorer.score_job(RESUME_PATH, payload.job_description)
 
 
@@ -578,8 +609,8 @@ def ats_score(payload: ATSRequest):
 @app.post("/api/recruiter-briefing")
 def recruiter_briefing(payload: RecruiterBriefingRequest):
     config, _s, llm_api_key = _load_runtime()
-    if not llm_api_key:
-        raise HTTPException(status_code=400, detail="LLM API key missing in secrets.yaml")
+    if not llm_available(llm_api_key):
+        raise HTTPException(status_code=400, detail=_llm_missing_detail())
     engine = RecruiterPrepEngine(AIAdapter(config, llm_api_key))
     briefing = engine.generate_briefing(payload.company, payload.role, str(RESUME_PATH))
     return briefing

@@ -23,7 +23,8 @@ class BotManager:
         self.applications_dir.mkdir(exist_ok=True)
         self.ai_adapter = None
         selected_key = llm_api_key or secrets.get("llm_api_key", "")
-        if selected_key:
+        from src.libs.llm_manager import llm_available
+        if llm_available(selected_key):
             try:
                 self.ai_adapter = AIAdapter(config, selected_key)
             except Exception as exc:
@@ -33,6 +34,16 @@ class BotManager:
         self.resume_path = config.get("uploads", {}).get("plainTextResume", Path("data_folder/plain_text_resume.yaml"))
 
     def run_batch(self, platform: str = "linkedin", count: int = 5):
+        self._active_bot = None
+        try:
+            return self._run_batch(platform, count)
+        finally:
+            # Release Chromium after every batch; the service process is long-lived.
+            if self._active_bot is not None:
+                self._active_bot.close()
+                self._active_bot = None
+
+    def _run_batch(self, platform: str = "linkedin", count: int = 5):
         logger.info(f"Starting {platform} batch for {count} jobs")
         
         bot = None
@@ -43,6 +54,7 @@ class BotManager:
         else:
             logger.error(f"Unsupported platform: {platform}")
             return 0
+        self._active_bot = bot
 
         dry_run = bool(self.config.get("dry_run", False))
         if not dry_run:

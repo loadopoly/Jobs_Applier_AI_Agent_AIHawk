@@ -44,8 +44,15 @@ def chrome_browser_options():
 def init_browser() -> webdriver.Chrome:
     try:
         options = chrome_browser_options()
-        # Use webdriver_manager to handle ChromeDriver
-        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
+        # In the container, use the distro Chromium + chromedriver pair baked
+        # into the image; elsewhere fall back to webdriver_manager.
+        chrome_bin = os.environ.get("CHROME_BIN")
+        driver_path = os.environ.get("CHROMEDRIVER_PATH")
+        if chrome_bin and os.path.exists(chrome_bin):
+            options.binary_location = chrome_bin
+        if not (driver_path and os.path.exists(driver_path)):
+            driver_path = ChromeDriverManager().install()
+        driver = webdriver.Chrome(service=ChromeService(driver_path), options=options)
         logger.debug("Chrome browser initialized successfully.")
         return driver
     except Exception as e:

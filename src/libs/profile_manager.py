@@ -85,7 +85,12 @@ class Profile:
         """Return profile summary for API responses."""
         metadata = self.load_metadata()
         
-        has_api_key = False
+        try:
+            # The QUIPU route carries its own key (OPENROUTER_API_KEY / XAI_API_KEY).
+            from src.libs.llm_manager import llm_available
+            has_api_key = llm_available("")
+        except Exception:
+            has_api_key = False
         has_linkedin = False
         has_resume = False
         has_email = False
